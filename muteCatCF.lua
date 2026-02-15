@@ -414,6 +414,7 @@ function AddOn:OnInitialize()
         self:DisableGearEvents()
     end)
     hooksecurefunc(CharacterFrame, "RefreshDisplay", function()
+            if not PaperDollFrame:IsVisible() then return end
             self:CheckIfTimerunner()
             self:AdjustCharacterInfoWindowSize()
             self:StyleCharacterHeaderClassColor()
@@ -432,6 +433,7 @@ function AddOn:OnInitialize()
         end
     end)
     hooksecurefunc("PaperDollFrame_UpdateStats", function()
+        if not PaperDollFrame:IsVisible() then return end
         self:StyleBlizzardItemLevelClassColor()
         self:StyleCharacterHeaderClassColor()
         self:LayoutCharacterHeaderLevelOnly()
@@ -450,8 +452,8 @@ function AddOn:AdjustCharacterInfoWindowSize()
         if charFrameInsetBotRightXOffset ~= 32 then CharacterFrameInset:SetPoint("BOTTOMRIGHT", CharacterFrame, "BOTTOMLEFT", 332, 4) end
         if charModelSceneBotRight then CharacterModelScene:ClearPoint("BOTTOMRIGHT") end
         if charMainHandSlotBotLeftXOffset ~= 130 then CharacterMainHandSlot:SetPoint("BOTTOMLEFT", PaperDollItemsFrame, "BOTTOMLEFT", 130, 16) end
-        if CharacterModelFrameBackgroundTopLeft:GetWidth() ~= 212 then CharacterModelFrameBackgroundTopLeft:SetWidth(212) end
-        if CharacterModelFrameBackgroundBotLeft:GetWidth() ~= 212 then CharacterModelFrameBackgroundBotLeft:SetWidth(212) end
+        if CharacterModelFrameBackgroundTopLeft and CharacterModelFrameBackgroundTopLeft:GetWidth() ~= 212 then CharacterModelFrameBackgroundTopLeft:SetWidth(212) end
+        if CharacterModelFrameBackgroundBotLeft and CharacterModelFrameBackgroundBotLeft:GetWidth() ~= 212 then CharacterModelFrameBackgroundBotLeft:SetWidth(212) end
         if CharacterModelScene:GetPlayerActor() then
             local actor = CharacterModelScene:GetPlayerActor()
             if actor:GetRequestedScale() then actor.requestedScale = nil end
