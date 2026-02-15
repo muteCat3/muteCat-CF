@@ -1,0 +1,148 @@
+**1.11.0**
+- Update for Patch 11.2.7
+- Fixed bug causing Timerunners to not be detected properly until UI reload
+- Documentation updates
+
+**1.10.0**
+- Hide indicators and options not available on Timerunners
+
+**1.9.1**
+- Fix bug with showing and hiding durability when the **Show Durability as Bar** option is selected
+- Minor code and documentation updates
+
+**1.9.0**
+- Add option to show durability as a bar rather than percentage text (includes exact durability percentage when hovering over the bar)
+- Fix a bug where socketed Fiber icon for Reshii Wraps did not appear
+- Update localizations for supported languages
+
+**1.8.2**
+- Fix bug that sometimes breaks other addons
+- Remove a tooltip appearing on login/reload when it shouldn't
+
+**1.8.1**
+- Fix a bug causing inactive enchants to be visible
+
+**1.8.0**
+- Update for Patch 11.2
+- Remove head enchant check
+- Add localization for `deDE`
+
+**1.7.2**
+- Correct minor issues with `frFR` localization
+
+**1.7.1**
+- Added localization support for `frFR`
+
+**1.7.0**
+- Updated the embellishment indicator to be more prominent (increased size and added a shadow behind it when visible)
+- Added an option to show or hide the button that toggles enchant text in the Character Info window
+- Updated localizations for supported languages
+- Added partial localization support for `zhTW`
+- Updated code documentation
+
+**1.6.1**
+- Fixed a bug where stats typically associated with tanks overlapped other stats for non-tank specs
+- Added ability to display stat values with decimals in the Character Info window
+- Updated localizations for supported languages
+- Updated code documentation
+
+**1.6.0**
+- Updated AddOn to run in Patch 11.1.7
+- Added an option to increase the size of the Character Info window
+- Replaced the "Show/Hide Enchant" button with an icon (Enchanting Formula) in the Character Info window
+- Added an option to display upgrade track colors using the item quality color scale (not the same as using the actual item quality color)
+- Fixed a bug where the option to use a custom upgrade track color didn't always stay selected on login/reload
+- Updated localizations for supported languages
+- Minor code cleanup
+- Update code documentation
+
+**1.5.0**
+- Added DataBroker integration to show a minimap icon for the AddOn that opens the options window when clicked
+- Added an option to show/hide the minimap icon under "Other Options"
+- Slash command updates:
+  - Added `/mcf help` and `/mutecatcf help` slash commands to list all available slash commands in the chat window
+  - Updated `/mcf` and `/mutecatcf` slash commands to open the AddOn options window without requiring the `config` argument
+  - Removed `/mcf config` and `/mutecatcf config` commands
+  - Added `/mcf minimap` and `/mutecatcf minimap` commands to toggle the minimap icon from the chat window
+- Updated localizations for all supported languages
+- Minor code cleanup
+- Update code documentation
+
+**1.4.5**
+- Allow item level to not have an outline when shown on top of the equipment icon
+- Fix a bug that showed Tinker sockets as Prismatic sockets
+- Add an option to show character equipped item level with up to 3 decimal places
+- Improved the character stats options so that stats are reordered immediately once an option is modified
+- Minor code cleanup
+- Update code documentation
+
+**1.4.4**
+- Fix some typos that were identified since the last release
+
+**v1.4.3**
+- Fix a number of bugs present in `ptBR` locale for displaying upgrade track and enchant text
+- Fix a bug that causes an error to occur when a profile gets reset
+- Fix some typos
+- Minor code cleanup
+- Update code documentation
+
+**v1.4.2**
+- Add missing embed dependency
+
+**v1.4.1**
+- Enable inspecting players outside party or raid
+- Rename "Use S&L Colors" item level coloring option to "Use Item Level Gradient"
+- Update "Item Level Gradient" coloring logic
+- Moved "Alternate Item Level Placement" option to Item Level section
+- Added missing abbreviation for *Authority of Fiery Resolve* enchant
+- Updated dependency Libraries
+
+**v1.4.0**
+- Enable Upgrade Track to be shown independent of item level in both Character Info and Inspect windows
+- Add an option to color item levels by highest/lowest values similar to the Shadow & Light plugin for ElvUI
+- Add an option to change the outline added to item level, upgrade track, and enchant text
+- Reduce space before and after gems when displaying
+
+**v1.3.3**
+- Fix bug for alignment of enchant and socket on some equipped items
+- Code cleanup and documentation
+
+**v1.3.2**
+- Fix inspect debugging statement appearing without debug mode enabled
+
+**v1.3.1**
+- Add head, wrist, and waist as socketable slots
+- Add abbreviations for Horrific Visions Revisited head enchants
+- Fix minor visual bug with weapon enchant positioning
+- Update abbreviations for enchant text
+
+**v1.3.0**
+- Enable option to show gear info when Inspecting another player
+- Minor code cleanup and refactoring
+
+**v1.2.0**
+- Enable live updates to Character Info window when Character Info and Settings windows are both open
+- Remove less important characters and spaces in text to improve readability
+- Adjust upgrade track position for main hand and off-hand equipment
+- Add language support for Portuguese (BR) and Russian (RU)
+- Add color customization options for upgrade track when shown (shows in item quality color by default)
+
+**v1.1.1**
+- Improve upgrade track info positioning
+- Show outdated season gear in gray
+
+**v1.1.0**
+- Show/Hide Enchant button hidden when enchants are disabled
+- Fixed bug that flagged shields and offhand items as not being enchanted
+
+**v1.0.0**
+- Initial Release
+
+**v0.5.0**
+- Add upgrade track option
+- Add missing gem, socket, and enchant indicators
+- Add stat order customization
+
+**v0.1.0**
+- Display item level, gem, and enchant information
+- Basic text color customization

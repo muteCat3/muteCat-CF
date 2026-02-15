@@ -1,0 +1,21 @@
+## Interface: 120001
+## Title: muteCat CF
+## Notes: Displays useful information about equipped gear in the Character Info window
+## IconTexture: Interface/Icons/INV_Chest_Plate08
+## Author: muteCat
+## Version: 1.11.0
+## SavedVariables: muteCatCFDB
+## Category: User Interface
+## X-Flavor: retail
+## X-Additional-Categories: Class, Unit Frames, Combat, Buffs & Debuffs
+## X-Localizations: enUS
+## X-License: GNU General Public License
+
+embeds.xml
+
+Localization\enUS.lua
+Constants.lua
+Utils.lua
+Modules\RetrieveGearInfo.lua
+Modules\PositionGearInfo.lua
+muteCatCF.lua
