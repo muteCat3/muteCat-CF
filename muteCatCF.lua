@@ -63,6 +63,26 @@ function AddOn:ShouldShowUpgradeTrack()
     return self.db.profile.showUpgradeTrack and not self.IsTimerunner
 end
 
+function AddOn:EnableGearEvents()
+    if self._gearEventsActive then
+        return
+    end
+    self:RegisterEvent("PLAYER_EQUIPMENT_CHANGED", "HandleEquipmentOrSettingsChange")
+    self:RegisterEvent("SOCKET_INFO_ACCEPT", "HandleEquipmentOrSettingsChange")
+    self._gearEventsActive = true
+end
+
+function AddOn:DisableGearEvents()
+    if not self._gearEventsActive then
+        return
+    end
+    self:UnregisterEvent("PLAYER_EQUIPMENT_CHANGED")
+    self:UnregisterEvent("SOCKET_INFO_ACCEPT")
+    self._gearEventsActive = false
+    self._pendingFullGearUpdate = false
+    self._pendingSlotUpdates = {}
+end
+
 ---@return table<number, Slot> slotsByID
 function AddOn:GetGearSlotsByID()
     if self._gearSlotsByID then
@@ -375,9 +395,7 @@ function AddOn:OnInitialize()
     -- Load database
 	self.db = LibStub("AceDB-3.0"):New("muteCatCFDB", DBDefaults, true)
     self.IsTimerunner = false
-
-    self:RegisterEvent("PLAYER_EQUIPMENT_CHANGED", "HandleEquipmentOrSettingsChange")
-    self:RegisterEvent("SOCKET_INFO_ACCEPT", "HandleEquipmentOrSettingsChange")
+    self._gearEventsActive = false
 
     -- Necessary to create DB entries for stat ordering when playing a new class/specialization
     DebugPrint(ColorText(addonName, "Heirloom"), "initialized successfully")
@@ -385,9 +403,15 @@ function AddOn:OnInitialize()
     -- Hook into necessary secure functions
     hooksecurefunc(CharacterFrame, "ShowSubFrame", function(_, subFrame)
         if subFrame == "PaperDollFrame" then
+            self:EnableGearEvents()
             self:CheckIfTimerunner()
             self:QueueGearInfoUpdate()
+        else
+            self:DisableGearEvents()
         end
+    end)
+    hooksecurefunc(CharacterFrame, "Hide", function()
+        self:DisableGearEvents()
     end)
     hooksecurefunc(CharacterFrame, "RefreshDisplay", function()
             self:CheckIfTimerunner()
