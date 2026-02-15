@@ -4,23 +4,21 @@ AddOn = LibStub("AceAddon-3.0"):GetAddon(addonName)
 local L = LibStub("AceLocale-3.0"):GetLocale(addonName, true)
 
 local function ResolveCurrentLevelCap()
-    local cap
-
-    if type(GetMaxLevelForLatestExpansion) == "function" then
-        local ok, value = pcall(GetMaxLevelForLatestExpansion)
-        if ok and type(value) == "number" and value > 0 then
-            cap = value
-        end
+    if type(GetExpansionLevel) ~= "function" or type(GetMaxLevelForExpansionLevel) ~= "function" then
+        return nil
     end
 
-    if not cap and type(GetMaxLevelForPlayerExpansion) == "function" then
-        local ok, value = pcall(GetMaxLevelForPlayerExpansion)
-        if ok and type(value) == "number" and value > 0 then
-            cap = value
-        end
+    local okLevel, expansionLevel = pcall(GetExpansionLevel)
+    if not okLevel or type(expansionLevel) ~= "number" then
+        return nil
     end
 
-    return cap
+    local okCap, levelCap = pcall(GetMaxLevelForExpansionLevel, expansionLevel)
+    if okCap and type(levelCap) == "number" and levelCap > 0 then
+        return levelCap
+    end
+
+    return nil
 end
 
 AddOn.CurrentExpac = AddOn.ExpansionInfo.TheWarWithin

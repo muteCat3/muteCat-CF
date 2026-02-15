@@ -289,7 +289,7 @@ function AddOn:ShowEmbellishmentBySlot(slot)
         local lines = GetTooltipLinesCached(self, item:GetItemLink())
         if lines then
             for _, ttdata in ipairs(lines) do
-                if ttdata and ttdata.leftText:find("Embellished") then
+                if ttdata and ttdata.leftText and ttdata.leftText:find("Embellished", 1, true) then
                     -- Create shadow layer (semi-transparent black)
                     if not slot.muteCatEmbellishmentShadow then
                         slot.muteCatEmbellishmentShadow = slot:CreateTexture("muteCatEmbellishmentShadow"..slot:GetID(), "ARTWORK")

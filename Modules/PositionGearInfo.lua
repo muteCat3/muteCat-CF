@@ -37,10 +37,13 @@ end
 ---Set item level text position in the Character Info window
 ---@param slot Slot The gear slot to set item level position for
 function AddOn:SetItemLevelPositionBySlot(slot)
+    local isWeaponSlot = slot == CharacterMainHandSlot or slot == CharacterSecondaryHandSlot
+    local weaponXOffset = isWeaponSlot and 1 or 0
+
     if self.db.profile.iLvlOnItem then
-        SetPointCached(slot.muteCatItemLevel, "CENTER", slot, "TOP", 0, -10)
+        SetPointCached(slot.muteCatItemLevel, "CENTER", slot, "TOP", weaponXOffset, -10)
     elseif slot.IsLeftSide == nil then
-        SetPointCached(slot.muteCatItemLevel, "CENTER", slot, "TOP", 0, 10)
+        SetPointCached(slot.muteCatItemLevel, "CENTER", slot, "TOP", weaponXOffset, 10)
     else
         SetPointCached(slot.muteCatItemLevel, slot.IsLeftSide and "LEFT" or "RIGHT", slot, slot.IsLeftSide and "RIGHT" or "LEFT", (slot.IsLeftSide and 1 or -1) * 10, 0)
     end
@@ -53,7 +56,7 @@ function AddOn:SetUpgradeTrackPositionBySlot(slot)
     local itemLevelShown = self.db.profile.showiLvl and not self.db.profile.iLvlOnItem and slot.muteCatItemLevel and slot.muteCatItemLevel:IsShown()
     local itemLevelShownOnItem = self.db.profile.showiLvl and self.db.profile.iLvlOnItem and slot.muteCatItemLevel and slot.muteCatItemLevel:IsShown()
     local isMainHand = slot == CharacterMainHandSlot
-    local yOffset = (slot == CharacterHandsSlot) and 1 or 0
+    local yOffset = (slot == CharacterHandsSlot or slot == CharacterLegsSlot or slot == CharacterWristSlot) and 1 or 0
 
     if slot.IsLeftSide == nil then
         SetPointCached(slot.muteCatUpgradeTrack, "CENTER", slot, "BOTTOM", (isMainHand and -1 or 1) * 40, 5)
