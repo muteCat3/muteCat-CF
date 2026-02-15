@@ -80,6 +80,7 @@ end
 ---Fetches and formats the upgrade track for an item in the defined gear slot (if one exists)
 ---@param slot Slot The gear slot to get item level for
 function AddOn:GetUpgradeTrackBySlot(slot)
+    self:EnsureTextReplacementTables()
     local isCharacterMaxLevel = self:IsPlayerMaxLevel()
     if not isCharacterMaxLevel then
         if slot.muteCatUpgradeTrack then slot.muteCatUpgradeTrack:Hide() end
@@ -203,6 +204,7 @@ end
 ---If an item that can be enchanted isn't and the option to show missing enchants is enabled, this will also be indicated in the formatted text.
 ---@param slot Slot The gear slot to get gem information for
 function AddOn:GetEnchantmentBySlot(slot)
+    self:EnsureTextReplacementTables()
     local isCharacterMaxLevel = self:IsPlayerMaxLevel()
     if not isCharacterMaxLevel then
         if slot.muteCatEnchant then slot.muteCatEnchant:Hide() end

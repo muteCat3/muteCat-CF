@@ -63,6 +63,42 @@ function AddOn:ShouldShowUpgradeTrack()
     return self.db.profile.showUpgradeTrack and not self.IsTimerunner
 end
 
+function AddOn:ApplyHeaderStyling()
+    if not PaperDollFrame:IsVisible() then return end
+    self:StyleBlizzardItemLevelClassColor()
+    self:StyleCharacterHeaderClassColor()
+    self:LayoutCharacterHeaderLevelOnly()
+end
+
+local function CaptureFontStringState(fs)
+    if not fs then
+        return nil, nil
+    end
+    return fs:IsShown(), fs:GetText()
+end
+
+---@param slot Slot
+---@return boolean changed
+function AddOn:DidSlotVisualStateChange(slot, beforeState)
+    local ilvlShownAfter, ilvlTextAfter = CaptureFontStringState(slot.muteCatItemLevel)
+    local trackShownAfter, trackTextAfter = CaptureFontStringState(slot.muteCatUpgradeTrack)
+    local gemShownAfter, gemTextAfter = CaptureFontStringState(slot.muteCatGems)
+    local enchShownAfter, enchTextAfter = CaptureFontStringState(slot.muteCatEnchant)
+    local embShownAfter = slot.muteCatEmbellishmentTexture and slot.muteCatEmbellishmentTexture:IsShown() or false
+    local embShadowShownAfter = slot.muteCatEmbellishmentShadow and slot.muteCatEmbellishmentShadow:IsShown() or false
+
+    return beforeState.ilvlShown ~= ilvlShownAfter
+        or beforeState.ilvlText ~= ilvlTextAfter
+        or beforeState.trackShown ~= trackShownAfter
+        or beforeState.trackText ~= trackTextAfter
+        or beforeState.gemShown ~= gemShownAfter
+        or beforeState.gemText ~= gemTextAfter
+        or beforeState.enchShown ~= enchShownAfter
+        or beforeState.enchText ~= enchTextAfter
+        or beforeState.embShown ~= embShownAfter
+        or beforeState.embShadowShown ~= embShadowShownAfter
+end
+
 function AddOn:EnableGearEvents()
     if self._gearEventsActive then
         return
@@ -81,6 +117,7 @@ function AddOn:DisableGearEvents()
     self._gearEventsActive = false
     self._pendingFullGearUpdate = false
     self._pendingSlotUpdates = {}
+    self._gearUpdateQueued = false
 end
 
 ---@return table<number, Slot> slotsByID
@@ -122,6 +159,20 @@ end
 ---@param slot Slot
 ---@param ctx table
 function AddOn:UpdateGearSlot(slot, ctx)
+    local ilvlShownBefore, ilvlTextBefore = CaptureFontStringState(slot.muteCatItemLevel)
+    local trackShownBefore, trackTextBefore = CaptureFontStringState(slot.muteCatUpgradeTrack)
+    local gemShownBefore, gemTextBefore = CaptureFontStringState(slot.muteCatGems)
+    local enchShownBefore, enchTextBefore = CaptureFontStringState(slot.muteCatEnchant)
+    local embShownBefore = slot.muteCatEmbellishmentTexture and slot.muteCatEmbellishmentTexture:IsShown() or false
+    local embShadowShownBefore = slot.muteCatEmbellishmentShadow and slot.muteCatEmbellishmentShadow:IsShown() or false
+    local beforeState = {
+        ilvlShown = ilvlShownBefore, ilvlText = ilvlTextBefore,
+        trackShown = trackShownBefore, trackText = trackTextBefore,
+        gemShown = gemShownBefore, gemText = gemTextBefore,
+        enchShown = enchShownBefore, enchText = enchTextBefore,
+        embShown = embShownBefore, embShadowShown = embShadowShownBefore,
+    }
+
     local slotID = slot:GetID()
     local profile = ctx.profile
 
@@ -198,6 +249,8 @@ function AddOn:UpdateGearSlot(slot, ctx)
         if slot.muteCatGems then slot.muteCatGems:Hide() end
         if slot.muteCatEnchant then slot.muteCatEnchant:Hide() end
     end
+
+    return self:DidSlotVisualStateChange(slot, beforeState)
 end
 
 ---@param slotIDs table<number, boolean>
@@ -208,16 +261,25 @@ function AddOn:UpdateSelectedGearSlots(slotIDs)
     end
     local slotsByID = self:GetGearSlotsByID()
     local ctx = self:CreateGearUpdateContext()
+    local anyChanged = false
     for slotID in pairs(slotIDs) do
         local slot = slotsByID[slotID]
         if slot then
-            self:UpdateGearSlot(slot, ctx)
+            anyChanged = self:UpdateGearSlot(slot, ctx) or anyChanged
         end
+    end
+    if anyChanged then
+        PaperDollFrame_UpdateStats()
     end
 end
 
 ---@param slotID? number
 function AddOn:QueueGearInfoUpdate(slotID)
+    local now = GetTime()
+    if slotID == nil and self._suppressFullUpdateUntil and now < self._suppressFullUpdateUntil then
+        return
+    end
+
     if slotID == nil then
         self._pendingFullGearUpdate = true
     elseif not self._pendingFullGearUpdate then
@@ -230,7 +292,16 @@ function AddOn:QueueGearInfoUpdate(slotID)
     end
     self._gearUpdateQueued = true
 
-    C_Timer.After(0, function()
+    local delay = 0
+    if self._firstQueuedGearUpdate then
+        delay = 0.2
+        self._firstQueuedGearUpdate = false
+    end
+    if self._startupCoalesceUntil and now < self._startupCoalesceUntil and delay < 0.08 then
+        delay = 0.08
+    end
+
+    C_Timer.After(delay, function()
         self._gearUpdateQueued = false
         if not PaperDollFrame:IsVisible() then
             self._pendingFullGearUpdate = false
@@ -244,6 +315,7 @@ function AddOn:QueueGearInfoUpdate(slotID)
         self._pendingSlotUpdates = {}
 
         if doFullUpdate then
+            self._suppressFullUpdateUntil = GetTime() + 0.35
             self:UpdateEquippedGearInfo()
         elseif pendingSlotUpdates and next(pendingSlotUpdates) ~= nil then
             self:UpdateSelectedGearSlots(pendingSlotUpdates)
@@ -396,6 +468,9 @@ function AddOn:OnInitialize()
 	self.db = LibStub("AceDB-3.0"):New("muteCatCFDB", DBDefaults, true)
     self.IsTimerunner = false
     self._gearEventsActive = false
+    self._firstQueuedGearUpdate = true
+    self._startupCoalesceUntil = GetTime() + 2
+    self._suppressFullUpdateUntil = 0
 
     -- Necessary to create DB entries for stat ordering when playing a new class/specialization
     DebugPrint(ColorText(addonName, "Heirloom"), "initialized successfully")
@@ -406,6 +481,7 @@ function AddOn:OnInitialize()
             self:EnableGearEvents()
             self:CheckIfTimerunner()
             self:QueueGearInfoUpdate()
+            self:ApplyHeaderStyling()
         else
             self:DisableGearEvents()
         end
@@ -417,8 +493,7 @@ function AddOn:OnInitialize()
             if not PaperDollFrame:IsVisible() then return end
             self:CheckIfTimerunner()
             self:AdjustCharacterInfoWindowSize()
-            self:StyleCharacterHeaderClassColor()
-            self:LayoutCharacterHeaderLevelOnly()
+            self:ApplyHeaderStyling()
         end)
     hooksecurefunc(CharacterModelScene, "TransitionToModelSceneID", function(cms, sceneID)
         if sceneID == 595 and PaperDollFrame:IsVisible() and self.db.profile.increaseCharacterInfoSize then
@@ -431,12 +506,6 @@ function AddOn:OnInitialize()
             -- Apply a offeset to the vertical positioning so that more of the model is visible (feet are not covered)
             actor:SetPosition(posX, posY, posZ + 0.25)
         end
-    end)
-    hooksecurefunc("PaperDollFrame_UpdateStats", function()
-        if not PaperDollFrame:IsVisible() then return end
-        self:StyleBlizzardItemLevelClassColor()
-        self:StyleCharacterHeaderClassColor()
-        self:LayoutCharacterHeaderLevelOnly()
     end)
 end
 
@@ -489,12 +558,16 @@ function AddOn:UpdateEquippedGearInfo()
         return
     end
     local ctx = self:CreateGearUpdateContext()
+    local anyChanged = false
 
     for _, slot in ipairs(self.GearSlots) do
-        self:UpdateGearSlot(slot, ctx)
+        anyChanged = self:UpdateGearSlot(slot, ctx) or anyChanged
     end
     -- Manually force a stats update to update item level decimal places and stat ordering if needed
-    PaperDollFrame_UpdateStats()
+    if anyChanged then
+        PaperDollFrame_UpdateStats()
+        self:ApplyHeaderStyling()
+    end
 end
 
 

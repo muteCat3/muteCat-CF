@@ -3,132 +3,133 @@ local addonName, AddOn = ...
 AddOn = LibStub("AceAddon-3.0"):NewAddon(addonName, "AceConsole-3.0", "AceEvent-3.0")
 local L = LibStub("AceLocale-3.0"):GetLocale(addonName, true)
 
----@enum DKEnchantAbbr
-AddOn.DKEnchantAbbr = {
-    Razorice = L["Razorice"],
-    Sanguination = L["Sang"],
-    Spellwarding = L["Spellward"],
-    Apocalypse = L["Apoc"],
-    FallenCrusader = L["Fall Crus"],
-    StoneskinGargoyle = L["Stnskn Garg"],
-    UnendingThirst = L["Unend Thirst"]
-}
-
 ---@class TextReplacement
 ---@field original string The localization key for the original text to search for when abbreviating text
 ---@field replacement string The localization key for the abbreviation for the original text
 
----A list of tables containing text replacement patterns for enchants
----@type TextReplacement[]
-AddOn.EnchantTextReplacements = {
-    { original = "%%", replacement = "%%%%" }, -- Required for proper string formatting (% is a special character in formatting)
-    { original = "+", replacement = "" }, -- Removes the '+' that usually prefixes enchantment text
-    { original = L["Enchanted: "], replacement = "" },
-    { original = L["Radiant Critical Strike"], replacement = L["Rad Crit"] },
-    { original = L["Radiant Haste"], replacement = L["Rad Hst"] },
-    { original = L["Radiant Mastery"], replacement = L["Rad Mast"] },
-    { original = L["Radiant Versatility"], replacement = L["Rad Vers"] },
-    { original = L["Cursed Critical Strike"], replacement = L["Curs Crit"] },
-    { original = L["Cursed Haste"], replacement = L["Curs Hst"] },
-    { original = L["Cursed Mastery"], replacement = L["Curs Mast"] },
-    { original = L["Cursed Versatility"], replacement = L["Curs Vers"] },
-    { original = L["Whisper of Armored Avoidance"], replacement = L["Arm Avoid"] },
-    { original = L["Whisper of Armored Leech"], replacement = L["Arm Leech"] },
-    { original = L["Whisper of Armored Speed"], replacement = L["Arm Spd"] },
-    { original = L["Whisper of Silken Avoidance"], replacement = L["Silk Avoid"] },
-    { original = L["Whisper of Silken Leech"], replacement = L["Silk Leech"] },
-    { original = L["Whisper of Silken Speed"], replacement = L["Silk Spd"] },
-    { original = L["Chant of Armored Avoidance"], replacement = L["Arm Avoid"] },
-    { original = L["Chant of Armored Leech"], replacement = L["Arm Leech"] },
-    { original = L["Chant of Armored Speed"], replacement = L["Arm Spd"] },
-    { original = L["Scout's March"], replacement = L["Sco March"] },
-    { original = L["Defender's March"], replacement = L["Def March"] },
-    { original = L["Cavalry's March"], replacement = L["Cav March"] },
-    { original = L["Stormrider's Agility"], replacement = L["Agi"] },
-    { original = L["Council's Intellect"], replacement = L["Int"] },
-    { original = L["Crystalline Radiance"], replacement = L["Crys Rad"] },
-    { original = L["Oathsworn's Strength"], replacement = L["Oath Str"] },
-    { original = L["Chant of Winged Grace"], replacement = L["Wing Grc"] },
-    { original = L["Chant of Leeching Fangs"], replacement = L["Leech Fang"] },
-    { original = L["Chant of Burrowing Rapidity"], replacement = L["Burr Rap"] },
-    { original = L["Authority of Air"], replacement = L["Auth Air"] },
-    { original = L["Authority of Fiery Resolve"], replacement = L["Fire Res"] },
-    { original = L["Authority of Radiant Power"], replacement = L["Rad Pow"] },
-    { original = L["Authority of the Depths"], replacement = L["Auth Deps"] },
-    { original = L["Authority of Storms"], replacement = L["Auth Storm"] },
-    { original = L["Oathsworn's Tenacity"], replacement = L["Oath Ten"] },
-    { original = L["Stonebound Artistry"], replacement = L["Stn Art"] },
-    { original = L["Stormrider's Fury"], replacement = L["Fury"] },
-    { original = L["Council's Guile"], replacement = L["Guile"] },
-    { original = L["Lesser Twilight Devastation"], replacement = L["Lssr Twi Dev"] },
-    { original = L["Greater Twilight Devastation"], replacement = L["Grtr Twi Dev"] },
-    { original = L["Lesser Void Ritual"], replacement = L["Lssr Void Rit"] },
-    { original = L["Greater Void Ritual"], replacement = L["Grtr Void Rit"] },
-    { original = L["Lesser Twisted Appendage"], replacement = L["Lssr Twst App"] },
-    { original = L["Greater Twisted Appendage"], replacement = L["Grtr Twst App"] },
-    { original = L["Lesser Echoing Void"], replacement = L["Lssr Echo Void"] },
-    { original = L["Greater Echoing Void"], replacement = L["Grtr Echo Void"] },
-    { original = L["Lesser Gushing Wound"], replacement = L["Lssr Gush Wnd"] },
-    { original = L["Greater Gushing Wound"], replacement = L["Grtr Gush Wnd"] },
-    { original = L["Lesser Infinite Stars"], replacement = L["Lssr Inf Star"] },
-    { original = L["Greater Infinite Stars"], replacement = L["Grtr Inf Star"] },
-    { original = L["Rune of the Fallen Crusader"], replacement = AddOn.DKEnchantAbbr.FallenCrusader },
-    { original = L["Rune of Razorice"], replacement = AddOn.DKEnchantAbbr.Razorice },
-    { original = L["Rune of Sanguination"], replacement = AddOn.DKEnchantAbbr.Sanguination },
-    { original = L["Rune of Spellwarding"], replacement = AddOn.DKEnchantAbbr.Spellwarding },
-    { original = L["Rune of the Apocalypse"], replacement = AddOn.DKEnchantAbbr.Apocalypse },
-    { original = L["Rune of the Stoneskin Gargoyle"], replacement = AddOn.DKEnchantAbbr.StoneskinGargoyle },
-    { original = L["Rune of Unending Thirst"], replacement = AddOn.DKEnchantAbbr.UnendingThirst },
-    { original = L["Stamina"], replacement = L["Stam"] },
-    { original = L["Intellect"], replacement = L["Int"] },
-    { original = L["Strength"], replacement = L["Str"] },
-    { original = L["Agility"], replacement = L["Agi"] },
-    { original = L["Speed"], replacement = L["Spd"] },
-    { original = L["Avoidance"], replacement = L["Avoid"] },
-    { original = L["Armor"], replacement = L["Arm"] },
-    { original = L["Haste"], replacement = L["Hst"] },
-    { original = L["Damage"], replacement = L["Dmg"] },
-    { original = L["Mastery"], replacement = L["Mast"] },
-    { original = L["Critical Strike"], replacement = L["Crit"] },
-    { original = L["Versatility"], replacement = L["Vers"] },
-    { original = L["Deftness"], replacement = L["Deft"] },
-    { original = L["Finesse"], replacement = L["Fin"] },
-    { original = L["Ingenuity"], replacement = L["Ing"] },
-    { original = L["Perception"], replacement = L["Perc"] },
-    { original = L["Resourcefulness"], replacement = L["Rsrc"] },
-    { original = L["Absorption"], replacement = L["Absorb"] },
-}
+---Builds text replacement tables lazily to reduce login/reload CPU spikes.
+function AddOn:EnsureTextReplacementTables()
+    if self.EnchantTextReplacements and self.UpgradeTextReplacements and self.DKEnchantAbbr then
+        return
+    end
 
----A list of tables containing text replacement patterns for enchants that are specific to the ptBR locale.
----Intended for replacement after language-agnostic replacements are completed
----@type TextReplacement[]
-AddOn.ptbrEnchantTextReplacements = {
-    { original = "Evasão", replacement = L["Avoid"] },
-    { original = "de ", replacement = "" },
-    { original = "da ", replacement = "" },
-    { original = "do ", replacement = "" },
-}
+    ---@enum DKEnchantAbbr
+    self.DKEnchantAbbr = {
+        Razorice = L["Razorice"],
+        Sanguination = L["Sang"],
+        Spellwarding = L["Spellward"],
+        Apocalypse = L["Apoc"],
+        FallenCrusader = L["Fall Crus"],
+        StoneskinGargoyle = L["Stnskn Garg"],
+        UnendingThirst = L["Unend Thirst"]
+    }
 
----A list of tables containing text replacement patterns for enchants that are specific to the frFR locale.
----Intended for replacement after language-agnostic replacements are completed
----@type TextReplacement[]
-AddOn.frfrEnchantTextReplacements = {
-    { original = "à la ", replacement = "" },
-    { original = "à l’", replacement = "" },
-    { original = "au score de ", replacement = "" },
-}
+    ---@type TextReplacement[]
+    self.EnchantTextReplacements = {
+        { original = "%%", replacement = "%%%%" }, -- Required for proper string formatting (% is a special character in formatting)
+        { original = "+", replacement = "" }, -- Removes the '+' that usually prefixes enchantment text
+        { original = L["Enchanted: "], replacement = "" },
+        { original = L["Radiant Critical Strike"], replacement = L["Rad Crit"] },
+        { original = L["Radiant Haste"], replacement = L["Rad Hst"] },
+        { original = L["Radiant Mastery"], replacement = L["Rad Mast"] },
+        { original = L["Radiant Versatility"], replacement = L["Rad Vers"] },
+        { original = L["Cursed Critical Strike"], replacement = L["Curs Crit"] },
+        { original = L["Cursed Haste"], replacement = L["Curs Hst"] },
+        { original = L["Cursed Mastery"], replacement = L["Curs Mast"] },
+        { original = L["Cursed Versatility"], replacement = L["Curs Vers"] },
+        { original = L["Whisper of Armored Avoidance"], replacement = L["Arm Avoid"] },
+        { original = L["Whisper of Armored Leech"], replacement = L["Arm Leech"] },
+        { original = L["Whisper of Armored Speed"], replacement = L["Arm Spd"] },
+        { original = L["Whisper of Silken Avoidance"], replacement = L["Silk Avoid"] },
+        { original = L["Whisper of Silken Leech"], replacement = L["Silk Leech"] },
+        { original = L["Whisper of Silken Speed"], replacement = L["Silk Spd"] },
+        { original = L["Chant of Armored Avoidance"], replacement = L["Arm Avoid"] },
+        { original = L["Chant of Armored Leech"], replacement = L["Arm Leech"] },
+        { original = L["Chant of Armored Speed"], replacement = L["Arm Spd"] },
+        { original = L["Scout's March"], replacement = L["Sco March"] },
+        { original = L["Defender's March"], replacement = L["Def March"] },
+        { original = L["Cavalry's March"], replacement = L["Cav March"] },
+        { original = L["Stormrider's Agility"], replacement = L["Agi"] },
+        { original = L["Council's Intellect"], replacement = L["Int"] },
+        { original = L["Crystalline Radiance"], replacement = L["Crys Rad"] },
+        { original = L["Oathsworn's Strength"], replacement = L["Oath Str"] },
+        { original = L["Chant of Winged Grace"], replacement = L["Wing Grc"] },
+        { original = L["Chant of Leeching Fangs"], replacement = L["Leech Fang"] },
+        { original = L["Chant of Burrowing Rapidity"], replacement = L["Burr Rap"] },
+        { original = L["Authority of Air"], replacement = L["Auth Air"] },
+        { original = L["Authority of Fiery Resolve"], replacement = L["Fire Res"] },
+        { original = L["Authority of Radiant Power"], replacement = L["Rad Pow"] },
+        { original = L["Authority of the Depths"], replacement = L["Auth Deps"] },
+        { original = L["Authority of Storms"], replacement = L["Auth Storm"] },
+        { original = L["Oathsworn's Tenacity"], replacement = L["Oath Ten"] },
+        { original = L["Stonebound Artistry"], replacement = L["Stn Art"] },
+        { original = L["Stormrider's Fury"], replacement = L["Fury"] },
+        { original = L["Council's Guile"], replacement = L["Guile"] },
+        { original = L["Lesser Twilight Devastation"], replacement = L["Lssr Twi Dev"] },
+        { original = L["Greater Twilight Devastation"], replacement = L["Grtr Twi Dev"] },
+        { original = L["Lesser Void Ritual"], replacement = L["Lssr Void Rit"] },
+        { original = L["Greater Void Ritual"], replacement = L["Grtr Void Rit"] },
+        { original = L["Lesser Twisted Appendage"], replacement = L["Lssr Twst App"] },
+        { original = L["Greater Twisted Appendage"], replacement = L["Grtr Twst App"] },
+        { original = L["Lesser Echoing Void"], replacement = L["Lssr Echo Void"] },
+        { original = L["Greater Echoing Void"], replacement = L["Grtr Echo Void"] },
+        { original = L["Lesser Gushing Wound"], replacement = L["Lssr Gush Wnd"] },
+        { original = L["Greater Gushing Wound"], replacement = L["Grtr Gush Wnd"] },
+        { original = L["Lesser Infinite Stars"], replacement = L["Lssr Inf Star"] },
+        { original = L["Greater Infinite Stars"], replacement = L["Grtr Inf Star"] },
+        { original = L["Rune of the Fallen Crusader"], replacement = self.DKEnchantAbbr.FallenCrusader },
+        { original = L["Rune of Razorice"], replacement = self.DKEnchantAbbr.Razorice },
+        { original = L["Rune of Sanguination"], replacement = self.DKEnchantAbbr.Sanguination },
+        { original = L["Rune of Spellwarding"], replacement = self.DKEnchantAbbr.Spellwarding },
+        { original = L["Rune of the Apocalypse"], replacement = self.DKEnchantAbbr.Apocalypse },
+        { original = L["Rune of the Stoneskin Gargoyle"], replacement = self.DKEnchantAbbr.StoneskinGargoyle },
+        { original = L["Rune of Unending Thirst"], replacement = self.DKEnchantAbbr.UnendingThirst },
+        { original = L["Stamina"], replacement = L["Stam"] },
+        { original = L["Intellect"], replacement = L["Int"] },
+        { original = L["Strength"], replacement = L["Str"] },
+        { original = L["Agility"], replacement = L["Agi"] },
+        { original = L["Speed"], replacement = L["Spd"] },
+        { original = L["Avoidance"], replacement = L["Avoid"] },
+        { original = L["Armor"], replacement = L["Arm"] },
+        { original = L["Haste"], replacement = L["Hst"] },
+        { original = L["Damage"], replacement = L["Dmg"] },
+        { original = L["Mastery"], replacement = L["Mast"] },
+        { original = L["Critical Strike"], replacement = L["Crit"] },
+        { original = L["Versatility"], replacement = L["Vers"] },
+        { original = L["Deftness"], replacement = L["Deft"] },
+        { original = L["Finesse"], replacement = L["Fin"] },
+        { original = L["Ingenuity"], replacement = L["Ing"] },
+        { original = L["Perception"], replacement = L["Perc"] },
+        { original = L["Resourcefulness"], replacement = L["Rsrc"] },
+        { original = L["Absorption"], replacement = L["Absorb"] },
+    }
 
----A list of tables containing text replacement patterns for upgrade tracks
----@type TextReplacement[]
-AddOn.UpgradeTextReplacements = {
-    { original = L["Upgrade Level: "], replacement = "" },
-    { original = L["Explorer "], replacement = "E" },
-    { original = L["Adventurer "], replacement = "A" },
-    { original = L["Veteran "], replacement = "V" },
-    { original = L["Champion "], replacement = "C" },
-    { original = L["Hero "], replacement = "H" },
-    { original = L["Myth "], replacement = "M" }
-}
+    ---@type TextReplacement[]
+    self.ptbrEnchantTextReplacements = {
+        { original = "Evasão", replacement = L["Avoid"] },
+        { original = "de ", replacement = "" },
+        { original = "da ", replacement = "" },
+        { original = "do ", replacement = "" },
+    }
+
+    ---@type TextReplacement[]
+    self.frfrEnchantTextReplacements = {
+        { original = "à la ", replacement = "" },
+        { original = "à l’", replacement = "" },
+        { original = "au score de ", replacement = "" },
+    }
+
+    ---@type TextReplacement[]
+    self.UpgradeTextReplacements = {
+        { original = L["Upgrade Level: "], replacement = "" },
+        { original = L["Explorer "], replacement = "E" },
+        { original = L["Adventurer "], replacement = "A" },
+        { original = L["Veteran "], replacement = "V" },
+        { original = L["Champion "], replacement = "C" },
+        { original = L["Hero "], replacement = "H" },
+        { original = L["Myth "], replacement = "M" }
+    }
+end
 
 ---@enum HexColorPresets
 AddOn.HexColorPresets = {
