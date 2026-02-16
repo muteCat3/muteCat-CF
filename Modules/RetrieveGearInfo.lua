@@ -7,6 +7,12 @@ local DebugPrint = AddOn.DebugPrint
 local ColorText = AddOn.ColorText
 local MAX_ITEMLEVEL_RETRIES = 6
 
+local function HideRegion(region)
+    if region then
+        region:Hide()
+    end
+end
+
 local function ClearItemLevelRetry(self, slotID)
     if self._pendingItemLevelRetry then
         self._pendingItemLevelRetry[slotID] = nil
@@ -14,6 +20,17 @@ local function ClearItemLevelRetry(self, slotID)
     if self._itemLevelRetryCount then
         self._itemLevelRetryCount[slotID] = nil
     end
+end
+
+---@param self muteCatCF
+---@param region Region?
+---@return boolean
+local function IsPlayerMaxLevelOrHide(self, region)
+    if self:IsPlayerMaxLevel() then
+        return true
+    end
+    HideRegion(region)
+    return false
 end
 
 local function GetTooltipLinesCached(self, itemLink)
@@ -57,6 +74,48 @@ local function IsMaxUpgradeTrackProgress(text)
     local current, max = text:match("(%d+)%s*/%s*(%d+)")
     if not current or not max then return false end
     return tonumber(current) == tonumber(max) and tonumber(max) > 0
+end
+
+local function GetDKEnchantTextureID(self, enchText)
+    if enchText == self.DKEnchantAbbr.Razorice or enchText == L["Rune of Razorice"] then
+        return 135842 -- Interface/Icons/Spell_Frost_FrostArmor
+    elseif enchText == self.DKEnchantAbbr.Sanguination or enchText == L["Rune of Sanguination"] then
+        return 1778226 -- Interface/Icons/Ability_Argus_DeathFod
+    elseif enchText == self.DKEnchantAbbr.Spellwarding or enchText == L["Rune of Spellwarding"] then
+        return 425952 -- Interface/Icons/Spell_Fire_TwilightFireward
+    elseif enchText == self.DKEnchantAbbr.Apocalypse or enchText == L["Rune of the Apocalypse"] then
+        return 237535 -- Interface/Icons/Spell_DeathKnight_Thrash_Ghoul
+    elseif enchText == self.DKEnchantAbbr.FallenCrusader or enchText == L["Rune of the Fallen Crusader"] then
+        return 135957 -- Interface/Icons/Spell_Holy_RetributionAura
+    elseif enchText == self.DKEnchantAbbr.StoneskinGargoyle or enchText == L["Rune of the Stoneskin Gargoyle"] then
+        return 237480 -- Interface/Icons/Inv_Sword_130
+    elseif enchText == self.DKEnchantAbbr.UnendingThirst or enchText == L["Rune of Unending Thirst"] then
+        return 3163621 -- Interface/Icons/Spell_NZInsanity_Bloodthirst
+    end
+    return nil
+end
+
+---@param trackText string
+---@return string|nil
+local function GetUpgradeTrackTierColor(self, trackText)
+    if not trackText or trackText == "" then
+        return nil
+    end
+
+    local tier = trackText:match("^%s*([EAVCHM])")
+    if tier == "E" or tier == "A" then
+        return self.HexColorPresets.Priest
+    elseif tier == "V" then
+        return self.HexColorPresets.Uncommon
+    elseif tier == "C" then
+        return self.HexColorPresets.Rare
+    elseif tier == "H" then
+        return self.HexColorPresets.Epic
+    elseif tier == "M" then
+        return self.HexColorPresets.Legendary
+    end
+
+    return nil
 end
 
 ---Fetches and formats the item level for an item in the defined gear slot (if one exists)
@@ -123,9 +182,7 @@ end
 ---@param slot Slot The gear slot to get item level for
 function AddOn:GetUpgradeTrackBySlot(slot)
     self:EnsureTextReplacementTables()
-    local isCharacterMaxLevel = self:IsPlayerMaxLevel()
-    if not isCharacterMaxLevel then
-        if slot.muteCatUpgradeTrack then slot.muteCatUpgradeTrack:Hide() end
+    if not IsPlayerMaxLevelOrHide(self, slot.muteCatUpgradeTrack) then
         return
     end
 
@@ -149,26 +206,15 @@ function AddOn:GetUpgradeTrackBySlot(slot)
 
         if upgradeTrackText ~= "" and not IsMaxUpgradeTrackProgress(upgradeTrackText) then
             local upgradeColor
-            if self.db.profile.useQualityScaleColorsForUpgradeTrack then
-                if upgradeTrackText:match("E") or upgradeTrackText:match("A") then
-                    upgradeColor = self.HexColorPresets.Priest
-                elseif upgradeTrackText:match("V") then
-                    upgradeColor = self.HexColorPresets.Uncommon
-                elseif upgradeTrackText:match("C") then
-                    upgradeColor = self.HexColorPresets.Rare
-                elseif upgradeTrackText:match("H") then
-                    upgradeColor = self.HexColorPresets.Epic
-                elseif upgradeTrackText:match("M") then
-                    upgradeColor = self.HexColorPresets.Legendary
-                else
+            if self.db.profile.useCustomColorForUpgradeTrack then
+                upgradeColor = self.db.profile.upgradeTrackCustomColor
+            else
+                -- Prefer deterministic track-tier coloring; fallback to item quality only when no tier is parsed.
+                upgradeColor = GetUpgradeTrackTierColor(self, upgradeTrackText)
+                if not upgradeColor then
                     local qualityHex = select(4, C_Item.GetItemQualityColor(item:GetItemQuality()))
                     upgradeColor = qualityHex and qualityHex:sub(3) or self.HexColorPresets.Info
                 end
-            elseif self.db.profile.useCustomColorForUpgradeTrack then
-                upgradeColor = self.db.profile.upgradeTrackCustomColor
-            else
-                local qualityHex = select(4, C_Item.GetItemQualityColor(item:GetItemQuality()))
-                upgradeColor = qualityHex and qualityHex:sub(3) or self.HexColorPresets.Info
             end
             slot.muteCatUpgradeTrack:SetFormattedText(ColorText(upgradeTrackText, upgradeColor))
             slot.muteCatUpgradeTrack:Show()
@@ -180,39 +226,38 @@ end
 ---If sockets are empty/can be addded to the item and the option to show missing sockets is enabled, these will also be indicated in the formatted text.
 ---@param slot Slot The gear slot to get gem information for
 function AddOn:GetGemsBySlot(slot)
-    local isCharacterMaxLevel = self:IsPlayerMaxLevel()
-    if not isCharacterMaxLevel then
-        if slot.muteCatGems then slot.muteCatGems:Hide() end
+    if not IsPlayerMaxLevelOrHide(self, slot.muteCatGems) then
         return
     end
 
+    local isCharacterMaxLevel = true
     local hasItem, item = self:IsItemEquippedInSlot(slot)
     local isSocketableSlot = self:IsSocketableSlot(slot)
     local isAuxSocketableSlot = self:IsAuxSocketableSlot(slot)
     if hasItem and (isSocketableSlot or isAuxSocketableSlot) then
         local existingSocketCount = 0
         local gemText = ""
-        local IsLeftSide = self:GetSlotIsLeftSide(slot)
+        local isLeftSide = self:GetSlotIsLeftSide(slot)
         local lines = GetTooltipLinesCached(self, item:GetItemLink())
         if lines then
             for _, ttdata in ipairs(lines) do
                 if ttdata and ttdata.type and ttdata.type == self.TooltipDataType.Gem then
                     -- Socketed item will have gemIcon variable
-                    if ttdata.gemIcon and IsLeftSide then
+                    if ttdata.gemIcon and isLeftSide then
                         DebugPrint("Found Gem Icon on left side slot:", ColorText(slot:GetID(), "Heirloom"), ttdata.gemIcon, self.GetTextureString(ttdata.gemIcon))
                         gemText = gemText..self.GetTextureString(ttdata.gemIcon)
                     elseif ttdata.gemIcon then
                         DebugPrint("Found Gem Icon:", ColorText(slot:GetID(), "Heirloom"), ttdata.gemIcon, self.GetTextureString(ttdata.gemIcon))
                         gemText = self.GetTextureString(ttdata.gemIcon)..gemText
                     -- Two conditions below check for tinker sockets
-                    elseif ttdata.socketType and IsLeftSide then
+                    elseif ttdata.socketType and isLeftSide then
                         DebugPrint("Empty tinker socket for in slot on left side:", ColorText(slot:GetID(), "Heirloom"), self.GetTextureString("Interface/ItemSocketingFrame/UI-EmptySocket-"..ttdata.socketType))
                         gemText = gemText..self.GetTextureString("Interface/ItemSocketingFrame/UI-EmptySocket-"..ttdata.socketType)
                     elseif ttdata.socketType then
                         DebugPrint("Empty tinker socket found in slot:", ColorText(slot:GetID(), "Heirloom"), self.GetTextureString("Interface/ItemSocketingFrame/UI-EmptySocket-"..ttdata.socketType))
                         gemText = self.GetTextureString("Interface/ItemSocketingFrame/UI-EmptySocket-"..ttdata.socketType)..gemText
                     -- The two conditions below indicate that there is an empty socket on the item
-                    elseif IsLeftSide then
+                    elseif isLeftSide then
                         DebugPrint("Empty socket found in slot on left side:", ColorText(slot:GetID(), "Heirloom"), self.GetTextureString(458977))
                         -- Texture: Interface/ItemSocketingFrame/UI-EmptySocket-Prismatic
                         gemText = gemText..self.GetTextureString(458977)
@@ -231,7 +276,7 @@ function AddOn:GetGemsBySlot(slot)
             if (self.db.profile.missingGemsMaxLevelOnly and isCharacterMaxLevel) or not self.db.profile.missingGemsMaxLevelOnly then
                 for i = 1, self.CurrentExpac.MaxSocketsPerItem - existingSocketCount, 1 do
                     DebugPrint("Slot", ColorText(slot:GetID(), "Heirloom"), "can add", i, i == 1 and "socket" or "sockets")
-                    gemText = IsLeftSide and gemText..self.GetTextureAtlasString("Socket-Prismatic-Closed") or self.GetTextureAtlasString("Socket-Prismatic-Closed")..gemText
+                    gemText = isLeftSide and gemText..self.GetTextureAtlasString("Socket-Prismatic-Closed") or self.GetTextureAtlasString("Socket-Prismatic-Closed")..gemText
                 end
             end
         end
@@ -247,60 +292,42 @@ end
 ---@param slot Slot The gear slot to get gem information for
 function AddOn:GetEnchantmentBySlot(slot)
     self:EnsureTextReplacementTables()
-    local isCharacterMaxLevel = self:IsPlayerMaxLevel()
-    if not isCharacterMaxLevel then
-        if slot.muteCatEnchant then slot.muteCatEnchant:Hide() end
+    if not IsPlayerMaxLevelOrHide(self, slot.muteCatEnchant) then
         return
     end
 
+    local isCharacterMaxLevel = true
     local hasItem, item = self:IsItemEquippedInSlot(slot)
     local isEnchantableSlot = self:IsEnchantableSlot(slot)
     if hasItem and isEnchantableSlot then
         local isEnchanted = false
-        local locale = GetLocale()
         local lines = GetTooltipLinesCached(self, item:GetItemLink())
         if lines then
             for _, ttdata in ipairs(lines) do
                 if ttdata and ttdata.type and ttdata.type == self.TooltipDataType.Enchant then
                     DebugPrint("Item in slot", ColorText(slot:GetID(), "Heirloom"), "is enchanted")
                     local enchText = ttdata.leftText
-                    DebugPrint("Original enchantment text:", ColorText(enchText, "Uncommon"))
-                    enchText = self:AbbreviateText(enchText, self.EnchantTextReplacements)
-                    -- Perform locale replacements specific to ptBR to further shorten and fix some abbreviations
-                    if locale == "ptBR" then enchText = self:AbbreviateText(enchText, self.ptbrEnchantTextReplacements)
-                    elseif locale == "frFR" then enchText = self:AbbreviateText(enchText, self.frfrEnchantTextReplacements) end
-                    -- Trim enchant text to remove leading and trailing whitespace
-                    -- strtrim is a Blizzard-provided global utility function
-                    enchText = strtrim(enchText)
-                    -- Resize any textures in the enchantment text
+                    enchText = strtrim(enchText or "")
+                    if enchText:sub(1, 1) == "+" then
+                        enchText = strtrim(enchText:sub(2))
+                    end
+                    if L["Enchanted: "] and enchText:find(L["Enchanted: "], 1, true) == 1 then
+                        enchText = strtrim(enchText:sub(#L["Enchanted: "] + 1))
+                    end
+
+                    -- Keep icon-only output: prefer embedded atlas; fallback to DK rune icon; else generic check.
                     local texture = enchText:match("|A:(.-):")
-                    -- If no texture is found, the enchant could be an older/DK one.
-                    -- If DK enchant, set texture based on the icon shown for each enchant in Runeforging
                     if not texture then
-                        local textureID
-                        if enchText == self.DKEnchantAbbr.Razorice then
-                            textureID = 135842 -- Interface/Icons/Spell_Frost_FrostArmor
-                        elseif enchText == self.DKEnchantAbbr.Sanguination then
-                            textureID = 1778226 -- Interface/Icons/Ability_Argus_DeathFod
-                        elseif enchText == self.DKEnchantAbbr.Spellwarding then
-                            textureID = 425952 -- Interface/Icons/Spell_Fire_TwilightFireward
-                        elseif enchText == self.DKEnchantAbbr.Apocalypse then
-                            textureID = 237535 -- Interface/Icons/Spell_DeathKnight_Thrash_Ghoul
-                        elseif enchText == self.DKEnchantAbbr.FallenCrusader then
-                            textureID = 135957 -- Interface/Icons/Spell_Holy_RetributionAura
-                        elseif enchText == self.DKEnchantAbbr.StoneskinGargoyle then
-                            textureID = 237480 -- Interface/Icons/Inv_Sword_130
-                        elseif enchText == self.DKEnchantAbbr.UnendingThirst then
-                            textureID = 3163621 -- Interface/Icons/Spell_NZInsanity_Bloodthirst
+                        local textureID = GetDKEnchantTextureID(self, enchText)
+                        if textureID then
+                            enchText = self.GetTextureString(textureID)
                         else
-                            textureID = 628564 -- Interface/Scenarios/ScenarioIcon-Check
+                            enchText = self.GetTextureString(628564) -- Interface/Scenarios/ScenarioIcon-Check
                         end
-                        texture = self.GetTextureString(textureID)
-                        enchText = texture
                     else
                         enchText = self.GetTextureAtlasString(texture)
                     end
-                    DebugPrint("Abbreviated enchantment text:", ColorText(enchText, "Uncommon"))
+                    DebugPrint("Enchant icon text:", ColorText(enchText, "Uncommon"))
     
                     if self.db.profile.useCustomColorForEnchants then
                         slot.muteCatEnchant:SetFormattedText(ColorText(enchText, self.db.profile.enchCustomColor))

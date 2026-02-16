@@ -105,21 +105,6 @@ function AddOn:EnsureTextReplacementTables()
     }
 
     ---@type TextReplacement[]
-    self.ptbrEnchantTextReplacements = {
-        { original = "Evasão", replacement = L["Avoid"] },
-        { original = "de ", replacement = "" },
-        { original = "da ", replacement = "" },
-        { original = "do ", replacement = "" },
-    }
-
-    ---@type TextReplacement[]
-    self.frfrEnchantTextReplacements = {
-        { original = "à la ", replacement = "" },
-        { original = "à l’", replacement = "" },
-        { original = "au score de ", replacement = "" },
-    }
-
-    ---@type TextReplacement[]
     self.UpgradeTextReplacements = {
         { original = L["Upgrade Level: "], replacement = "" },
         { original = L["Explorer "], replacement = "E" },

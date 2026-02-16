@@ -4,6 +4,33 @@ AddOn = LibStub("AceAddon-3.0"):GetAddon(addonName)
 
 local DebugPrint = AddOn.DebugPrint
 
+---@param slot Slot
+---@return boolean itemLevelShown
+---@return boolean itemLevelShownOnItem
+---@return boolean upgradeTrackShown
+---@return boolean gemsShown
+---@return boolean enchantShown
+local function GetSlotVisibilityState(self, slot)
+    local itemLevelShown = self.db.profile.showiLvl
+        and not self.db.profile.iLvlOnItem
+        and slot.muteCatItemLevel
+        and slot.muteCatItemLevel:IsShown()
+    local itemLevelShownOnItem = self.db.profile.showiLvl
+        and self.db.profile.iLvlOnItem
+        and slot.muteCatItemLevel
+        and slot.muteCatItemLevel:IsShown()
+    local upgradeTrackShown = self:ShouldShowUpgradeTrack()
+        and slot.muteCatUpgradeTrack
+        and slot.muteCatUpgradeTrack:IsShown()
+    local gemsShown = self:ShouldShowGems()
+        and slot.muteCatGems
+        and slot.muteCatGems:IsShown()
+    local enchantShown = self:ShouldShowEnchants()
+        and slot.muteCatEnchant
+        and slot.muteCatEnchant:IsShown()
+    return itemLevelShown, itemLevelShownOnItem, upgradeTrackShown, gemsShown, enchantShown
+end
+
 ---@param region Region
 ---@param point string
 ---@param relativeTo Region|Frame
@@ -55,8 +82,7 @@ end
 ---Set upgrade track text position in the Character Info window
 ---@param slot Slot The gear slot to set upgrade tracks position for
 function AddOn:SetUpgradeTrackPositionBySlot(slot)
-    local itemLevelShown = self.db.profile.showiLvl and not self.db.profile.iLvlOnItem and slot.muteCatItemLevel and slot.muteCatItemLevel:IsShown()
-    local itemLevelShownOnItem = self.db.profile.showiLvl and self.db.profile.iLvlOnItem and slot.muteCatItemLevel and slot.muteCatItemLevel:IsShown()
+    local itemLevelShown, itemLevelShownOnItem = GetSlotVisibilityState(self, slot)
     local isMainHand = slot == CharacterMainHandSlot
     local yOffset = (slot == CharacterHandsSlot or slot == CharacterLegsSlot or slot == CharacterWristSlot) and 1 or 0
 
@@ -75,10 +101,7 @@ end
 ---Set gems text position in the Character Info window
 ---@param slot Slot The gear slot to set gems position for
 function AddOn:SetGemsPositionBySlot(slot)
-    local itemLevelShown = self.db.profile.showiLvl and not self.db.profile.iLvlOnItem and slot.muteCatItemLevel and slot.muteCatItemLevel:IsShown()
-    local itemLevelShownOnItem = self.db.profile.showiLvl and self.db.profile.iLvlOnItem and slot.muteCatItemLevel and slot.muteCatItemLevel:IsShown()
-    local upgradeTrackShown = self:ShouldShowUpgradeTrack() and slot.muteCatUpgradeTrack and slot.muteCatUpgradeTrack:IsShown()
-    local enchantShown = self:ShouldShowEnchants() and slot.muteCatEnchant and slot.muteCatEnchant:IsShown()
+    local itemLevelShown, itemLevelShownOnItem, upgradeTrackShown, _, enchantShown = GetSlotVisibilityState(self, slot)
     local isMainHand = slot == CharacterMainHandSlot
 
     -- Gems on weapon/shield/off-hand slots (not possible as far as I am aware, but you never know)
@@ -112,10 +135,7 @@ end
 function AddOn:SetEnchantPositionBySlot(slot)
     local isSocketableSlot = self:IsSocketableSlot(slot) or self:IsAuxSocketableSlot(slot)
     local isEnchantableSlot = self:IsEnchantableSlot(slot)
-    local itemLevelShown = self.db.profile.showiLvl and not self.db.profile.iLvlOnItem and slot.muteCatItemLevel and slot.muteCatItemLevel:IsShown()
-    local itemLevelShownOnItem = self.db.profile.showiLvl and self.db.profile.iLvlOnItem and slot.muteCatItemLevel and slot.muteCatItemLevel:IsShown()
-    local upgradeTrackShown = self:ShouldShowUpgradeTrack() and slot.muteCatUpgradeTrack and slot.muteCatUpgradeTrack:IsShown()
-    local gemsShown = self:ShouldShowGems() and slot.muteCatGems and slot.muteCatGems:IsShown()
+    local itemLevelShown, itemLevelShownOnItem, upgradeTrackShown, gemsShown = GetSlotVisibilityState(self, slot)
     if itemLevelShown and slot.IsLeftSide ~= nil and isEnchantableSlot then
         -- Adjust positioning for slots that have both item level and enchants visible
         DebugPrint("ilvl and enchant visible")

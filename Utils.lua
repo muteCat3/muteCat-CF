@@ -88,16 +88,6 @@ function AddOn.CompressTable(tbl)
     end
 end
 
----@param tbl table Table to count entries for
----@return number count The number of entries in `tbl`
-function AddOn.GetTableSize(tbl)
-    local count = 0
-    for k in pairs(tbl) do
-        count = count + 1
-    end
-    return count
-end
-
 ---Converts color values for red, green, and blue into their corresponding hexadecimal code
 ---@param r number The red value for the color expressed as a decimal between `0` and `255`
 ---@param g number The green value for the color expressed as a decimal between `0` and `255`
@@ -323,7 +313,7 @@ end
 ---@return string abbreviation The abbreviated version of `text` as per the entries in `replacementTable`
 function AddOn:AbbreviateText(text, replacementTable)
     if not text then return "" end
-    if self.GetTableSize(replacementTable) == 0 then return text end
+    if not replacementTable or next(replacementTable) == nil then return text end
     local abbreviation = text
     for _, repl in pairs(replacementTable) do
         abbreviation = abbreviation:gsub(repl.original, repl.replacement)

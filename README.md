@@ -1,20 +1,36 @@
 # muteCat CF
-A focused Character Frame addon for Retail WoW.
+`muteCat CF` ist ein schlankes Character-Frame-Addon fuer WoW Retail mit Fokus auf klare Gear-Infos direkt an den Slots.
 
-## What it does
-- Shows per-slot item level on equipped gear
-- Shows upgrade track (hidden when missing or maxed, e.g. 8/8)
-- Shows gem sockets and enchant quality indicators
-- Shows embellishment marker
-- Applies class-color styling to Character Frame header/item level text
+## Features
+- Item Level pro Slot im Character Frame
+- Upgrade Track pro Slot
+- Upgrade Track wird automatisch ausgeblendet, wenn:
+  - kein Track vorhanden ist
+  - Track bereits maxed ist (z. B. `8/8`)
+- Gem-Icons pro Slot
+- Enchant als Icon (kein Text)
+- Missing-Enchant Warnsymbol
+- Embellishment Marker
+- Grosses Blizzard-Itemlevel und Header-Styling im Character Frame
 
-## Scope
-- Character Frame only (no Inspect support)
-- English only
-- No options UI/profiles in this streamlined version
+## Verhalten
+- Character Frame only (kein Inspect)
+- English only (`enUS`)
+- Performance-optimiert:
+  - reduzierte Updates bei geschlossenem Character Frame
+  - gebuendelte Slot-Updates
+  - progressiver Full-Refresh beim Oeffnen
 
-## Compatibility
-- WoW Retail (`## Interface: 120001`)
+## Screenshot
+![muteCat CF Screenshot](Media/muteCatCF_screenshot.png)
 
-## Owner
+## Installation
+1. Addon-Ordner nach `World of Warcraft/_retail_/Interface/AddOns/muteCat CF` kopieren.
+2. Sicherstellen, dass die TOC-Datei `muteCat CF.toc` heisst.
+3. Spiel starten bzw. `/reload`.
+
+## Kompatibilitaet
+- WoW Retail (`Interface: 120001`)
+
+## Autor
 - muteCat

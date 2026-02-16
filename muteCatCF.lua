@@ -10,6 +10,12 @@ local function IsPaperDollVisible()
     return PaperDollFrame and PaperDollFrame:IsVisible()
 end
 
+local function HideRegion(region)
+    if region then
+        region:Hide()
+    end
+end
+
 local DBDefaults = {
     profile = {
         showiLvl = true,
@@ -265,14 +271,14 @@ function AddOn:UpdateGearSlot(slot, ctx)
     if ctx.showEmbellishments then
         self:ShowEmbellishmentBySlot(slot)
     else
-        if slot.muteCatEmbellishmentTexture then slot.muteCatEmbellishmentTexture:Hide() end
-        if slot.muteCatEmbellishmentShadow then slot.muteCatEmbellishmentShadow:Hide() end
+        HideRegion(slot.muteCatEmbellishmentTexture)
+        HideRegion(slot.muteCatEmbellishmentShadow)
     end
 
     if ctx.hideShirtTabardInfo and (slot == CharacterShirtSlot or slot == CharacterTabardSlot) then
-        if slot.muteCatItemLevel then slot.muteCatItemLevel:Hide() end
-        if slot.muteCatGems then slot.muteCatGems:Hide() end
-        if slot.muteCatEnchant then slot.muteCatEnchant:Hide() end
+        HideRegion(slot.muteCatItemLevel)
+        HideRegion(slot.muteCatGems)
+        HideRegion(slot.muteCatEnchant)
     end
 
     return self:DidSlotVisualStateChange(slot, beforeState)
