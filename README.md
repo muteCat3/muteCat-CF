@@ -15,7 +15,6 @@
 
 ## Scope
 - Character Frame only (no Inspect support)
-- English only (`enUS`)
 
 ## Screenshot
 ![muteCat CF Screenshot](Media/muteCatCF_screenshot.png)
