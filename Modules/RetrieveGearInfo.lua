@@ -5,6 +5,16 @@ local L = LibStub("AceLocale-3.0"):GetLocale(addonName, true)
 
 local DebugPrint = AddOn.DebugPrint
 local ColorText = AddOn.ColorText
+local MAX_ITEMLEVEL_RETRIES = 6
+
+local function ClearItemLevelRetry(self, slotID)
+    if self._pendingItemLevelRetry then
+        self._pendingItemLevelRetry[slotID] = nil
+    end
+    if self._itemLevelRetryCount then
+        self._itemLevelRetryCount[slotID] = nil
+    end
+end
 
 local function GetTooltipLinesCached(self, itemLink)
     if not itemLink or itemLink == "" then
@@ -12,14 +22,22 @@ local function GetTooltipLinesCached(self, itemLink)
     end
 
     self._tooltipLineCache = self._tooltipLineCache or {}
+    self._tooltipCacheSize = self._tooltipCacheSize or 0
     local cached = self._tooltipLineCache[itemLink]
     if cached ~= nil then
         return cached ~= false and cached or nil
     end
 
+    -- Keep cache bounded to avoid step-wise memory growth on repeated open/close cycles.
+    if self._tooltipCacheSize >= 128 then
+        self._tooltipLineCache = {}
+        self._tooltipCacheSize = 0
+    end
+
     local tooltip = C_TooltipInfo.GetHyperlink(itemLink)
     local lines = tooltip and tooltip.lines or nil
     self._tooltipLineCache[itemLink] = lines or false
+    self._tooltipCacheSize = self._tooltipCacheSize + 1
     return lines
 end
 
@@ -44,10 +62,12 @@ end
 ---Fetches and formats the item level for an item in the defined gear slot (if one exists)
 ---@param slot Slot The gear slot to get item level for
 function AddOn:GetItemLevelBySlot(slot)
+    local slotID = slot:GetID()
     local hasItem, item = self:IsItemEquippedInSlot(slot)
     if hasItem then
         local itemLevel = item:GetCurrentItemLevel()
         if itemLevel > 0 then -- positive value indicates item info has loaded
+            ClearItemLevelRetry(self, slotID)
             local iLvlText = tostring(itemLevel)
             if self.db.profile.useGradientColorsForILvl then
                 local equippedItemLevel = self._equippedAvgItemLevel or select(2, GetAverageItemLevel())
@@ -71,9 +91,31 @@ function AddOn:GetItemLevelBySlot(slot)
             slot.muteCatItemLevel:SetFormattedText(iLvlText)
             slot.muteCatItemLevel:Show()
         else
-            DebugPrint("Item Level less than 0 found, retry self:GetItemLevelBySlot for slot", ColorText(slot:GetID(), "Heirloom"))
-            C_Timer.After(0.5, function() self:GetItemLevelBySlot(slot) end)
+            self._pendingItemLevelRetry = self._pendingItemLevelRetry or {}
+            if self._pendingItemLevelRetry[slotID] then
+                return
+            end
+            self._itemLevelRetryCount = self._itemLevelRetryCount or {}
+            local retryCount = (self._itemLevelRetryCount[slotID] or 0) + 1
+            self._itemLevelRetryCount[slotID] = retryCount
+            if retryCount > MAX_ITEMLEVEL_RETRIES then
+                DebugPrint("Item Level retry limit reached for slot", ColorText(slotID, "Heirloom"))
+                self._pendingItemLevelRetry[slotID] = nil
+                return
+            end
+            self._pendingItemLevelRetry[slotID] = true
+            DebugPrint("Item Level not loaded yet, scheduling retry for slot", ColorText(slotID, "Heirloom"))
+            C_Timer.After(0.5, function()
+                if self._pendingItemLevelRetry then
+                    self._pendingItemLevelRetry[slotID] = nil
+                end
+                if PaperDollFrame and PaperDollFrame:IsVisible() then
+                    self:GetItemLevelBySlot(slot)
+                end
+            end)
         end
+    else
+        ClearItemLevelRetry(self, slotID)
     end
 end
 

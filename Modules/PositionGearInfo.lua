@@ -25,13 +25,15 @@ local function SetPointCached(region, point, relativeTo, relativePoint, xOffset,
 
     region:ClearAllPoints()
     region:SetPoint(point, relativeTo, relativePoint, xOffset, yOffset)
-    region.muteCatPointCache = {
-        point = point,
-        relativeTo = relativeTo,
-        relativePoint = relativePoint,
-        xOffset = xOffset,
-        yOffset = yOffset,
-    }
+    if not cache then
+        cache = {}
+        region.muteCatPointCache = cache
+    end
+    cache.point = point
+    cache.relativeTo = relativeTo
+    cache.relativePoint = relativePoint
+    cache.xOffset = xOffset
+    cache.yOffset = yOffset
 end
 
 ---Set item level text position in the Character Info window

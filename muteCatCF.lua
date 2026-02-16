@@ -4,6 +4,11 @@ AddOn = LibStub("AceAddon-3.0"):GetAddon(addonName)
 
 local DebugPrint = AddOn.DebugPrint
 local ColorText = AddOn.ColorText
+local FULL_REFRESH_SLOTS_PER_TICK = 4
+
+local function IsPaperDollVisible()
+    return PaperDollFrame and PaperDollFrame:IsVisible()
+end
 
 local DBDefaults = {
     profile = {
@@ -64,10 +69,23 @@ function AddOn:ShouldShowUpgradeTrack()
 end
 
 function AddOn:ApplyHeaderStyling()
-    if not PaperDollFrame:IsVisible() then return end
+    if not IsPaperDollVisible() then return end
     self:StyleBlizzardItemLevelClassColor()
     self:StyleCharacterHeaderClassColor()
     self:LayoutCharacterHeaderLevelOnly()
+end
+
+function AddOn:QueueHeaderStyling()
+    if self._headerStyleQueued then
+        return
+    end
+    self._headerStyleQueued = true
+    C_Timer.After(0, function()
+        self._headerStyleQueued = false
+        if IsPaperDollVisible() then
+            self:ApplyHeaderStyling()
+        end
+    end)
 end
 
 local function CaptureFontStringState(fs)
@@ -109,15 +127,23 @@ function AddOn:EnableGearEvents()
 end
 
 function AddOn:DisableGearEvents()
-    if not self._gearEventsActive then
-        return
+    if self._gearEventsActive then
+        self:UnregisterEvent("PLAYER_EQUIPMENT_CHANGED")
+        self:UnregisterEvent("SOCKET_INFO_ACCEPT")
+        self._gearEventsActive = false
     end
-    self:UnregisterEvent("PLAYER_EQUIPMENT_CHANGED")
-    self:UnregisterEvent("SOCKET_INFO_ACCEPT")
-    self._gearEventsActive = false
-    self._pendingFullGearUpdate = false
+
+    -- Always clear runtime update state when the character frame is not active.
+    self._pendingItemLevelRetry = {}
+    self._itemLevelRetryCount = {}
     self._pendingSlotUpdates = {}
-    self._gearUpdateQueued = false
+    self._slotUpdateQueued = false
+    self._fullRefreshQueued = false
+    self._fullRefreshIndex = 1
+    self._fullRefreshAnyChanged = false
+    if self._fullRefreshSlotList then
+        wipe(self._fullRefreshSlotList)
+    end
 end
 
 ---@return table<number, Slot> slotsByID
@@ -138,7 +164,6 @@ end
 ---@return table ctx
 function AddOn:CreateGearUpdateContext()
     local profile = self.db.profile
-    self._tooltipLineCache = {}
     self._equippedAvgItemLevel = profile.useGradientColorsForILvl and select(2, GetAverageItemLevel()) or nil
 
     return {
@@ -270,57 +295,162 @@ function AddOn:UpdateSelectedGearSlots(slotIDs)
     end
     if anyChanged then
         PaperDollFrame_UpdateStats()
+        self:QueueHeaderStyling()
     end
 end
 
 ---@param slotID? number
 function AddOn:QueueGearInfoUpdate(slotID)
-    local now = GetTime()
-    if slotID == nil and self._suppressFullUpdateUntil and now < self._suppressFullUpdateUntil then
+    if not IsPaperDollVisible() then
         return
     end
 
     if slotID == nil then
-        self._pendingFullGearUpdate = true
-    elseif not self._pendingFullGearUpdate then
-        self._pendingSlotUpdates = self._pendingSlotUpdates or {}
-        self._pendingSlotUpdates[slotID] = true
-    end
-
-    if self._gearUpdateQueued then
+        self:QueueFullGearRefresh()
         return
     end
-    self._gearUpdateQueued = true
 
-    local delay = 0
-    if self._firstQueuedGearUpdate then
-        delay = 0.2
-        self._firstQueuedGearUpdate = false
+    self:UpdateSelectedGearSlots({ [slotID] = true })
+end
+
+function AddOn:QueueFullGearRefresh()
+    if not IsPaperDollVisible() then
+        return
     end
-    if self._startupCoalesceUntil and now < self._startupCoalesceUntil and delay < 0.08 then
-        delay = 0.08
+    if not self.GearSlots then
+        return
     end
 
-    C_Timer.After(delay, function()
-        self._gearUpdateQueued = false
-        if not PaperDollFrame:IsVisible() then
-            self._pendingFullGearUpdate = false
+    self._fullRefreshSlotList = self._fullRefreshSlotList or {}
+    wipe(self._fullRefreshSlotList)
+    for _, slot in ipairs(self.GearSlots) do
+        self._fullRefreshSlotList[#self._fullRefreshSlotList + 1] = slot:GetID()
+    end
+    self._fullRefreshIndex = 1
+    self._fullRefreshAnyChanged = false
+
+    if self._fullRefreshQueued then
+        return
+    end
+
+    self._fullRefreshQueued = true
+    C_Timer.After(0, function()
+        self:ProcessQueuedFullGearRefresh()
+    end)
+end
+
+function AddOn:ProcessQueuedFullGearRefresh()
+    self._fullRefreshQueued = false
+    if not IsPaperDollVisible() then
+        return
+    end
+
+    local slotList = self._fullRefreshSlotList
+    local idx = self._fullRefreshIndex or 1
+    if not slotList or idx > #slotList then
+        if self._fullRefreshAnyChanged then
+            PaperDollFrame_UpdateStats()
+            self:QueueHeaderStyling()
+        end
+        return
+    end
+
+    local slotsByID = self:GetGearSlotsByID()
+    local ctx = self:CreateGearUpdateContext()
+    local endIdx = math.min(idx + FULL_REFRESH_SLOTS_PER_TICK - 1, #slotList)
+    for i = idx, endIdx do
+        local slot = slotsByID[slotList[i]]
+        if slot then
+            self._fullRefreshAnyChanged = self:UpdateGearSlot(slot, ctx) or self._fullRefreshAnyChanged
+        end
+    end
+
+    self._fullRefreshIndex = endIdx + 1
+    if self._fullRefreshIndex <= #slotList then
+        self._fullRefreshQueued = true
+        C_Timer.After(0, function()
+            self:ProcessQueuedFullGearRefresh()
+        end)
+        return
+    end
+
+    if self._fullRefreshAnyChanged then
+        PaperDollFrame_UpdateStats()
+        self:QueueHeaderStyling()
+    end
+end
+
+function AddOn:QueueSlotButtonUpdate(slotID)
+    if not IsPaperDollVisible() then
+        return
+    end
+    if type(slotID) ~= "number" or slotID <= 0 then
+        return
+    end
+
+    self._pendingSlotUpdates = self._pendingSlotUpdates or {}
+    self._pendingSlotUpdates[slotID] = true
+
+    if self._slotUpdateQueued then
+        return
+    end
+
+    self._slotUpdateQueued = true
+    C_Timer.After(0, function()
+        self._slotUpdateQueued = false
+        if not IsPaperDollVisible() then
             self._pendingSlotUpdates = {}
             return
         end
 
-        local doFullUpdate = self._pendingFullGearUpdate
-        local pendingSlotUpdates = self._pendingSlotUpdates
-        self._pendingFullGearUpdate = false
+        local pending = self._pendingSlotUpdates
         self._pendingSlotUpdates = {}
-
-        if doFullUpdate then
-            self._suppressFullUpdateUntil = GetTime() + 0.35
-            self:UpdateEquippedGearInfo()
-        elseif pendingSlotUpdates and next(pendingSlotUpdates) ~= nil then
-            self:UpdateSelectedGearSlots(pendingSlotUpdates)
+        if not pending or not next(pending) then
+            return
         end
+
+        self:CheckIfTimerunner()
+        self:UpdateSelectedGearSlots(pending)
     end)
+end
+
+---@param slotID number
+---@return boolean
+function AddOn:ShouldProcessSlotButtonUpdate(slotID)
+    if type(slotID) ~= "number" or slotID <= 0 then
+        return false
+    end
+
+    self._lastSeenSlotLinks = self._lastSeenSlotLinks or {}
+    local currentLink = GetInventoryItemLink("player", slotID) or false
+    if self._lastSeenSlotLinks[slotID] == currentLink then
+        return false
+    end
+
+    self._lastSeenSlotLinks[slotID] = currentLink
+    return true
+end
+
+function AddOn:ClearTooltipCache()
+    self._tooltipLineCache = {}
+    self._tooltipCacheSize = 0
+end
+
+---@param slotID number
+function AddOn:InvalidateTooltipCacheForSlot(slotID)
+    if type(slotID) ~= "number" or slotID <= 0 then
+        self:ClearTooltipCache()
+        return
+    end
+
+    local currentLink = GetInventoryItemLink("player", slotID)
+    local previousLink = self._lastSeenSlotLinks and self._lastSeenSlotLinks[slotID] or nil
+    if previousLink then
+        self._tooltipLineCache[previousLink] = nil
+    end
+    if currentLink then
+        self._tooltipLineCache[currentLink] = nil
+    end
 end
 
 function AddOn:StyleBlizzardItemLevelClassColor()
@@ -465,12 +595,20 @@ end
 
 function AddOn:OnInitialize()
     -- Load database
-	self.db = LibStub("AceDB-3.0"):New("muteCatCFDB", DBDefaults, true)
+    self.db = LibStub("AceDB-3.0"):New("muteCatCFDB", DBDefaults, true)
     self.IsTimerunner = false
     self._gearEventsActive = false
-    self._firstQueuedGearUpdate = true
-    self._startupCoalesceUntil = GetTime() + 2
-    self._suppressFullUpdateUntil = 0
+    self._headerStyleQueued = false
+    self._pendingSlotUpdates = {}
+    self._slotUpdateQueued = false
+    self._fullRefreshQueued = false
+    self._fullRefreshSlotList = {}
+    self._fullRefreshIndex = 1
+    self._fullRefreshAnyChanged = false
+    self._tooltipLineCache = {}
+    self._tooltipCacheSize = 0
+    self._itemLevelRetryCount = {}
+    self._lastSeenSlotLinks = {}
 
     -- Necessary to create DB entries for stat ordering when playing a new class/specialization
     DebugPrint(ColorText(addonName, "Heirloom"), "initialized successfully")
@@ -480,8 +618,8 @@ function AddOn:OnInitialize()
         if subFrame == "PaperDollFrame" then
             self:EnableGearEvents()
             self:CheckIfTimerunner()
-            self:QueueGearInfoUpdate()
-            self:ApplyHeaderStyling()
+            self:QueueFullGearRefresh()
+            self:QueueHeaderStyling()
         else
             self:DisableGearEvents()
         end
@@ -490,45 +628,60 @@ function AddOn:OnInitialize()
         self:DisableGearEvents()
     end)
     hooksecurefunc(CharacterFrame, "RefreshDisplay", function()
-            if not PaperDollFrame:IsVisible() then return end
+            if not IsPaperDollVisible() then return end
             self:CheckIfTimerunner()
             self:AdjustCharacterInfoWindowSize()
-            self:ApplyHeaderStyling()
+            self:QueueHeaderStyling()
         end)
+    hooksecurefunc("PaperDollFrame_UpdateStats", function()
+        if not IsPaperDollVisible() then return end
+        self:StyleBlizzardItemLevelClassColor()
+    end)
     hooksecurefunc(CharacterModelScene, "TransitionToModelSceneID", function(cms, sceneID)
-        if sceneID == 595 and PaperDollFrame:IsVisible() and self.db.profile.increaseCharacterInfoSize then
+        if sceneID == 595 and IsPaperDollVisible() and self.db.profile.increaseCharacterInfoSize then
             local actor = cms:GetPlayerActor()
             DebugPrint("CMS Transition: requested scale before mod - ", actor:GetRequestedScale())
             actor:SetRequestedScale(actor:GetRequestedScale() * 0.8)
             actor:UpdateScale()
             DebugPrint("Updated requested scale to", actor:GetRequestedScale())
             local posX, posY, posZ = actor:GetPosition()
-            -- Apply a offeset to the vertical positioning so that more of the model is visible (feet are not covered)
+            -- Apply an offset so more of the model is visible (feet are not covered).
             actor:SetPosition(posX, posY, posZ + 0.25)
         end
+    end)
+    hooksecurefunc("PaperDollItemSlotButton_Update", function(button)
+        if not IsPaperDollVisible() then return end
+        if not button or not button.GetID then return end
+        local slotID = button:GetID()
+        if not self:ShouldProcessSlotButtonUpdate(slotID) then
+            return
+        end
+        self:QueueSlotButtonUpdate(slotID)
     end)
 end
 
 ---Handles changing the Character Info window size when the option to use the larger character window is checked
 function AddOn:AdjustCharacterInfoWindowSize()
     DebugPrint("AdjustCharacterInfoWindowSize - Using default Blizzard layout")
-    if PaperDollFrame:IsVisible() then
-        -- Always keep Blizzard default sizing/anchors.
-        local charFrameInsetBotRightXOffset = select(4, CharacterFrameInset:GetPointByName("BOTTOMRIGHT"))
-        local charModelSceneBotRight = CharacterModelScene:GetPointByName("BOTTOMRIGHT")
-        local charMainHandSlotBotLeftXOffset = select(4, CharacterMainHandSlot:GetPointByName("BOTTOMLEFT"))
-        if CharacterFrame:GetWidth() ~= CHARACTERFRAME_EXPANDED_WIDTH then CharacterFrame:SetWidth(CHARACTERFRAME_EXPANDED_WIDTH) end
-        if charFrameInsetBotRightXOffset ~= 32 then CharacterFrameInset:SetPoint("BOTTOMRIGHT", CharacterFrame, "BOTTOMLEFT", 332, 4) end
-        if charModelSceneBotRight then CharacterModelScene:ClearPoint("BOTTOMRIGHT") end
-        if charMainHandSlotBotLeftXOffset ~= 130 then CharacterMainHandSlot:SetPoint("BOTTOMLEFT", PaperDollItemsFrame, "BOTTOMLEFT", 130, 16) end
-        if CharacterModelFrameBackgroundTopLeft and CharacterModelFrameBackgroundTopLeft:GetWidth() ~= 212 then CharacterModelFrameBackgroundTopLeft:SetWidth(212) end
-        if CharacterModelFrameBackgroundBotLeft and CharacterModelFrameBackgroundBotLeft:GetWidth() ~= 212 then CharacterModelFrameBackgroundBotLeft:SetWidth(212) end
-        if CharacterModelScene:GetPlayerActor() then
-            local actor = CharacterModelScene:GetPlayerActor()
-            if actor:GetRequestedScale() then actor.requestedScale = nil end
-            actor:UpdateScale()
-            if select(3, actor:GetPosition()) > 1.25 then actor:SetPosition(0, 0, select(3, actor:GetPosition()) - 0.25) end
-        end
+    if not IsPaperDollVisible() then
+        return
+    end
+
+    -- Always keep Blizzard default sizing/anchors.
+    local charFrameInsetBotRightXOffset = select(4, CharacterFrameInset:GetPointByName("BOTTOMRIGHT"))
+    local charModelSceneBotRight = CharacterModelScene:GetPointByName("BOTTOMRIGHT")
+    local charMainHandSlotBotLeftXOffset = select(4, CharacterMainHandSlot:GetPointByName("BOTTOMLEFT"))
+    if CharacterFrame:GetWidth() ~= CHARACTERFRAME_EXPANDED_WIDTH then CharacterFrame:SetWidth(CHARACTERFRAME_EXPANDED_WIDTH) end
+    if charFrameInsetBotRightXOffset ~= 32 then CharacterFrameInset:SetPoint("BOTTOMRIGHT", CharacterFrame, "BOTTOMLEFT", 332, 4) end
+    if charModelSceneBotRight then CharacterModelScene:ClearPoint("BOTTOMRIGHT") end
+    if charMainHandSlotBotLeftXOffset ~= 130 then CharacterMainHandSlot:SetPoint("BOTTOMLEFT", PaperDollItemsFrame, "BOTTOMLEFT", 130, 16) end
+    if CharacterModelFrameBackgroundTopLeft and CharacterModelFrameBackgroundTopLeft:GetWidth() ~= 212 then CharacterModelFrameBackgroundTopLeft:SetWidth(212) end
+    if CharacterModelFrameBackgroundBotLeft and CharacterModelFrameBackgroundBotLeft:GetWidth() ~= 212 then CharacterModelFrameBackgroundBotLeft:SetWidth(212) end
+    if CharacterModelScene:GetPlayerActor() then
+        local actor = CharacterModelScene:GetPlayerActor()
+        if actor:GetRequestedScale() then actor.requestedScale = nil end
+        actor:UpdateScale()
+        if select(3, actor:GetPosition()) > 1.25 then actor:SetPosition(0, 0, select(3, actor:GetPosition()) - 0.25) end
     end
 end
 
@@ -536,38 +689,22 @@ end
 ---@param event string
 ---@param ... any
 function AddOn:HandleEquipmentOrSettingsChange(event, ...)
-    if PaperDollFrame:IsVisible() then
-        DebugPrint("Changed equipped item or AddOn setting, updating gear information")
-        if event == "PLAYER_EQUIPMENT_CHANGED" then
-            local slotID = ...
-            if type(slotID) == "number" and slotID > 0 then
-                self:QueueGearInfoUpdate(slotID)
-            else
-                self:QueueGearInfoUpdate()
-            end
-        else
-            self:QueueGearInfoUpdate()
-        end
-    end
-end
-
----Updates information displayed in the Character Info window
-function AddOn:UpdateEquippedGearInfo()
-    if not self.GearSlots then
-        DebugPrint("Gear slots table not found")
+    if not IsPaperDollVisible() then
         return
     end
-    local ctx = self:CreateGearUpdateContext()
-    local anyChanged = false
 
-    for _, slot in ipairs(self.GearSlots) do
-        anyChanged = self:UpdateGearSlot(slot, ctx) or anyChanged
+    DebugPrint("Changed equipped item or AddOn setting, updating gear information")
+    if event == "PLAYER_EQUIPMENT_CHANGED" then
+        local slotID = ...
+        if type(slotID) == "number" and slotID > 0 then
+            self:InvalidateTooltipCacheForSlot(slotID)
+            self:QueueGearInfoUpdate(slotID)
+            return
+        end
     end
-    -- Manually force a stats update to update item level decimal places and stat ordering if needed
-    if anyChanged then
-        PaperDollFrame_UpdateStats()
-        self:ApplyHeaderStyling()
-    end
+
+    self:ClearTooltipCache()
+    self:QueueGearInfoUpdate()
 end
 
 

@@ -6,6 +6,7 @@
 ## Version: 1.11.0
 ## SavedVariables: muteCatCFDB
 ## Category: User Interface
+## OptionalDeps: Blizzard_CharacterUI
 ## X-Flavor: retail
 ## X-Additional-Categories: Class, Unit Frames, Combat, Buffs & Debuffs
 ## X-Localizations: enUS
@@ -16,6 +17,6 @@ embeds.xml
 Localization\enUS.lua
 Constants.lua
 Utils.lua
+muteCatCF.lua
 Modules\RetrieveGearInfo.lua
 Modules\PositionGearInfo.lua
-muteCatCF.lua
