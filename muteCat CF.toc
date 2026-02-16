@@ -14,7 +14,6 @@
 
 embeds.xml
 
-Localization\enUS.lua
 Constants.lua
 Utils.lua
 muteCatCF.lua

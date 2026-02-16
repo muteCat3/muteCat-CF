@@ -1,7 +1,7 @@
 local addonName, AddOn = ...
 ---@class muteCatCF: AceAddon, AceConsole-3.0, AceEvent-3.0
 AddOn = LibStub("AceAddon-3.0"):GetAddon(addonName)
-local L = LibStub("AceLocale-3.0"):GetLocale(addonName, true)
+local L = AddOn.L
 
 local function ResolveCurrentLevelCap()
     if type(GetExpansionLevel) ~= "function" or type(GetMaxLevelForExpansionLevel) ~= "function" then

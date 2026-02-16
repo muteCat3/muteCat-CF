@@ -1,7 +1,15 @@
 local addonName, AddOn = ...
 ---@class muteCatCF: AceAddon, AceConsole-3.0, AceEvent-3.0
 AddOn = LibStub("AceAddon-3.0"):NewAddon(addonName, "AceConsole-3.0", "AceEvent-3.0")
-local L = LibStub("AceLocale-3.0"):GetLocale(addonName, true)
+if not AddOn.L then
+    AddOn.L = setmetatable({}, {
+        __index = function(t, k)
+            rawset(t, k, k)
+            return k
+        end,
+    })
+end
+local L = AddOn.L
 
 ---@class TextReplacement
 ---@field original string The localization key for the original text to search for when abbreviating text
