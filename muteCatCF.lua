@@ -45,7 +45,6 @@ local DBDefaults = {
         useCustomColorForEnchants = false,
         enchCustomColor = AddOn.HexColorPresets.Uncommon,
         iLvlOnItem = false,
-        showEmbellishments = true,
         hideShirtTabardInfo = false,
         discoveredGems = {},
     },
@@ -66,9 +65,6 @@ function AddOn:ShouldShowEnchants()
     return self.db.profile.showEnchants and not self.IsTimerunner and self:IsPlayerMaxLevel()
 end
 
-function AddOn:ShouldShowEmbellishments()
-    return self.db.profile.showEmbellishments and not self.IsTimerunner and self:IsPlayerMaxLevel()
-end
 
 function AddOn:ShouldShowUpgradeTrack()
     return self.db.profile.showUpgradeTrack and not self.IsTimerunner and self:IsPlayerMaxLevel()
@@ -103,13 +99,12 @@ end
 
 ---@param slot Slot
 ---@return boolean changed
-function AddOn:DidSlotVisualStateChange(slot, ilvlShownBefore, ilvlTextBefore, trackShownBefore, trackTextBefore, gemShownBefore, gemTextBefore, enchShownBefore, enchTextBefore, embShownBefore, embShadowShownBefore)
+function AddOn:DidSlotVisualStateChange(slot, ilvlShownBefore, ilvlTextBefore, trackShownBefore, trackTextBefore, gemShownBefore, gemTextBefore, enchShownBefore, enchTextBefore)
     local ilvlShownAfter, ilvlTextAfter = CaptureFontStringState(slot.muteCatItemLevel)
     local trackShownAfter, trackTextAfter = CaptureFontStringState(slot.muteCatUpgradeTrack)
     local gemShownAfter, gemTextAfter = CaptureFontStringState(slot.muteCatGems)
     local enchShownAfter, enchTextAfter = CaptureFontStringState(slot.muteCatEnchant)
-    local embShownAfter = slot.muteCatEmbellishmentTexture and slot.muteCatEmbellishmentTexture:IsShown() or false
-    local embShadowShownAfter = slot.muteCatEmbellishmentShadow and slot.muteCatEmbellishmentShadow:IsShown() or false
+
 
     return ilvlShownBefore ~= ilvlShownAfter
         or ilvlTextBefore ~= ilvlTextAfter
@@ -119,8 +114,7 @@ function AddOn:DidSlotVisualStateChange(slot, ilvlShownBefore, ilvlTextBefore, t
         or gemTextBefore ~= gemTextAfter
         or enchShownBefore ~= enchShownAfter
         or enchTextBefore ~= enchTextAfter
-        or embShownBefore ~= embShownAfter
-        or embShadowShownBefore ~= embShadowShownAfter
+
 end
 
 function AddOn:EnableGearEvents()
@@ -177,7 +171,7 @@ function AddOn:GetGearUpdateContext()
     reusableCtx.showUpgradeTrack = self:ShouldShowUpgradeTrack()
     reusableCtx.showGems = self:ShouldShowGems()
     reusableCtx.showEnchants = self:ShouldShowEnchants()
-    reusableCtx.showEmbellishments = self:ShouldShowEmbellishments()
+
     reusableCtx.hideShirtTabardInfo = profile.hideShirtTabardInfo
     reusableCtx.iLvlTextScale = (profile.iLvlScale and profile.iLvlScale > 0) and profile.iLvlScale or 1
     reusableCtx.upgradeTrackTextScale = ((profile.upgradeTrackScale and profile.upgradeTrackScale > 0) and profile.upgradeTrackScale or 1) * 0.9
@@ -194,8 +188,7 @@ function AddOn:UpdateGearSlot(slot, ctx)
     local trackShownBefore, trackTextBefore = CaptureFontStringState(slot.muteCatUpgradeTrack)
     local gemShownBefore, gemTextBefore = CaptureFontStringState(slot.muteCatGems)
     local enchShownBefore, enchTextBefore = CaptureFontStringState(slot.muteCatEnchant)
-    local embShownBefore = slot.muteCatEmbellishmentTexture and slot.muteCatEmbellishmentTexture:IsShown() or false
-    local embShadowShownBefore = slot.muteCatEmbellishmentShadow and slot.muteCatEmbellishmentShadow:IsShown() or false
+
 
     local slotID = slot:GetID()
     local profile = ctx.profile
@@ -261,12 +254,6 @@ function AddOn:UpdateGearSlot(slot, ctx)
         slot.muteCatEnchant:Hide()
     end
 
-    if ctx.showEmbellishments then
-        self:ShowEmbellishmentBySlot(slot)
-    else
-        HideRegion(slot.muteCatEmbellishmentTexture)
-        HideRegion(slot.muteCatEmbellishmentShadow)
-    end
 
     if ctx.hideShirtTabardInfo and (slot == CharacterShirtSlot or slot == CharacterTabardSlot) then
         HideRegion(slot.muteCatItemLevel)
@@ -274,7 +261,7 @@ function AddOn:UpdateGearSlot(slot, ctx)
         HideRegion(slot.muteCatEnchant)
     end
 
-    return self:DidSlotVisualStateChange(slot, ilvlShownBefore, ilvlTextBefore, trackShownBefore, trackTextBefore, gemShownBefore, gemTextBefore, enchShownBefore, enchTextBefore, embShownBefore, embShadowShownBefore)
+    return self:DidSlotVisualStateChange(slot, ilvlShownBefore, ilvlTextBefore, trackShownBefore, trackTextBefore, gemShownBefore, gemTextBefore, enchShownBefore, enchTextBefore)
 end
 
 ---@param slotIDs table<number, boolean>

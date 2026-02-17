@@ -112,7 +112,6 @@ AddOn.ExpansionInfo = {
         },
         MaxSocketsPerItem = 2,
         MaxAuxSocketsPerItem = 1,
-        MaxEmbellishments = 2,
         EnchantableSlots = {
             CharacterHeadSlot,
             CharacterBackSlot,
