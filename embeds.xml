@@ -6,4 +6,4 @@ https://raw.githubusercontent.com/Gethe/wow-ui-source/live/Interface/AddOns/Bliz
   <Include file="Libs\AceConsole-3.0\AceConsole-3.0.xml"/>
   <Include file="Libs\AceDB-3.0\AceDB-3.0.xml"/>
   <Include file="Libs\AceEvent-3.0\AceEvent-3.0.xml"/>
-</Ui>
+  </Ui>

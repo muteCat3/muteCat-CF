@@ -76,6 +76,13 @@ local function IsMaxUpgradeTrackProgress(text)
     return tonumber(current) == tonumber(max) and tonumber(max) > 0
 end
 
+local function GetEnchantIDFromLink(itemLink)
+    if not itemLink then return nil end
+    -- Item Link Structure: item:itemID:enchantID:gemID1:gemID2:gemID3:gemID4:suffixID:uniqueID:linkLevel:specializationID:upgradeTypeID:instanceDifficultyID:numBonusIDs:bonusID1:bonusID2...
+    local enchantID = itemLink:match("item:%d+:(%d+):")
+    return tonumber(enchantID)
+end
+
 local function GetDKEnchantTextureID(self, enchText)
     if enchText == self.DKEnchantAbbr.Razorice or enchText == L["Rune of Razorice"] then
         return 135842 -- Interface/Icons/Spell_Frost_FrostArmor
@@ -103,19 +110,21 @@ local function GetUpgradeTrackTierColor(self, trackText)
     end
 
     local tier = trackText:match("^%s*([EAVCHM])")
-    if tier == "E" or tier == "A" then
-        return self.HexColorPresets.Priest
-    elseif tier == "V" then
-        return self.HexColorPresets.Uncommon
-    elseif tier == "C" then
-        return self.HexColorPresets.Rare
-    elseif tier == "H" then
-        return self.HexColorPresets.Epic
-    elseif tier == "M" then
-        return self.HexColorPresets.Legendary
+    if not tier then return nil end
+
+    -- Lazy initialization of the lookup table
+    if not self._upgradeTrackColorMap then
+        self._upgradeTrackColorMap = {
+            E = self.HexColorPresets.Priest,
+            A = self.HexColorPresets.Priest,
+            V = self.HexColorPresets.Uncommon,
+            C = self.HexColorPresets.Rare,
+            H = self.HexColorPresets.Epic,
+            M = self.HexColorPresets.Legendary,
+        }
     end
 
-    return nil
+    return self._upgradeTrackColorMap[tier]
 end
 
 ---Fetches and formats the item level for an item in the defined gear slot (if one exists)
@@ -124,7 +133,8 @@ function AddOn:GetItemLevelBySlot(slot)
     local slotID = slot:GetID()
     local hasItem, item = self:IsItemEquippedInSlot(slot)
     if hasItem then
-        local itemLevel = item:GetCurrentItemLevel()
+        local itemLevel = item:GetCurrentItemLevel() or 0
+
         if itemLevel > 0 then -- positive value indicates item info has loaded
             ClearItemLevelRetry(self, slotID)
             local iLvlText = tostring(itemLevel)
@@ -306,33 +316,60 @@ function AddOn:GetEnchantmentBySlot(slot)
             for _, ttdata in ipairs(lines) do
                 if ttdata and ttdata.type and ttdata.type == self.TooltipDataType.Enchant then
                     DebugPrint("Item in slot", ColorText(slot:GetID(), "Heirloom"), "is enchanted")
-                    local enchText = ttdata.leftText
-                    enchText = strtrim(enchText or "")
-                    if enchText:sub(1, 1) == "+" then
-                        enchText = strtrim(enchText:sub(2))
-                    end
-                    if L["Enchanted: "] and enchText:find(L["Enchanted: "], 1, true) == 1 then
-                        enchText = strtrim(enchText:sub(#L["Enchanted: "] + 1))
+                    
+                    local texture
+                    local enchantID = GetEnchantIDFromLink(item:GetItemLink())
+                    if enchantID and AddOn.EnchantIDToTextureID[enchantID] then
+                        local mappedValue = AddOn.EnchantIDToTextureID[enchantID]
+                        
+                        if type(mappedValue) == "number" then
+                            -- Assume Spell ID, get icon from spell
+                            texture = C_Spell and C_Spell.GetSpellTexture(mappedValue) or GetSpellTexture(mappedValue)
+                            
+                            -- Fallback if GetSpellTexture fails but we have a number (could be raw FileID)
+                            if not texture then
+                                 texture = mappedValue
+                            end
+                            texture = self.GetTextureString(texture)
+                        else
+                             -- Assume Atlas or Texture Path string
+                             texture = self.GetTextureAtlasString(mappedValue)
+                        end
+                         DebugPrint("Enchant found via ID:", ColorText(enchantID, "Heirloom"), "->", texture)
                     end
 
-                    -- Keep icon-only output: prefer embedded atlas; fallback to DK rune icon; else generic check.
-                    local texture = enchText:match("|A:(.-):")
+                    local enchText = ttdata.leftText
+                    enchText = strtrim(enchText or "")
+                    
                     if not texture then
-                        local textureID = GetDKEnchantTextureID(self, enchText)
-                        if textureID then
-                            enchText = self.GetTextureString(textureID)
-                        else
-                            enchText = self.GetTextureString(628564) -- Interface/Scenarios/ScenarioIcon-Check
+                        -- Fallback: Text Parsing
+                        if enchText:sub(1, 1) == "+" then
+                            enchText = strtrim(enchText:sub(2))
                         end
-                    else
-                        enchText = self.GetTextureAtlasString(texture)
+                        if L["Enchanted: "] and enchText:find(L["Enchanted: "], 1, true) == 1 then
+                            enchText = strtrim(enchText:sub(#L["Enchanted: "] + 1))
+                        end
+
+                        -- Keep icon-only output: prefer embedded atlas; fallback to DK rune icon; else generic check.
+                        local atlas = enchText:match("|A:(.-):")
+                        if not atlas then
+                            local textureID = GetDKEnchantTextureID(self, enchText)
+                            if textureID then
+                                texture = self.GetTextureString(textureID)
+                            else
+                                texture = self.GetTextureString(628564) -- Interface/Scenarios/ScenarioIcon-Check
+                            end
+                        else
+                            texture = self.GetTextureAtlasString(atlas)
+                        end
                     end
-                    DebugPrint("Enchant icon text:", ColorText(enchText, "Uncommon"))
+                    
+                    DebugPrint("Enchant icon text:", ColorText(texture, "Uncommon"))
     
                     if self.db.profile.useCustomColorForEnchants then
-                        slot.muteCatEnchant:SetFormattedText(ColorText(enchText, self.db.profile.enchCustomColor))
+                        slot.muteCatEnchant:SetFormattedText(ColorText(texture, self.db.profile.enchCustomColor))
                     else
-                        slot.muteCatEnchant:SetFormattedText(ColorText(enchText, "Uncommon"))
+                        slot.muteCatEnchant:SetFormattedText(ColorText(texture, "Uncommon"))
                     end
                     slot.muteCatEnchant:Show()
                     isEnchanted = true

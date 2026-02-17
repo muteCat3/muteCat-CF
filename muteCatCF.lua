@@ -103,7 +103,7 @@ end
 
 ---@param slot Slot
 ---@return boolean changed
-function AddOn:DidSlotVisualStateChange(slot, beforeState)
+function AddOn:DidSlotVisualStateChange(slot, ilvlShownBefore, ilvlTextBefore, trackShownBefore, trackTextBefore, gemShownBefore, gemTextBefore, enchShownBefore, enchTextBefore, embShownBefore, embShadowShownBefore)
     local ilvlShownAfter, ilvlTextAfter = CaptureFontStringState(slot.muteCatItemLevel)
     local trackShownAfter, trackTextAfter = CaptureFontStringState(slot.muteCatUpgradeTrack)
     local gemShownAfter, gemTextAfter = CaptureFontStringState(slot.muteCatGems)
@@ -111,16 +111,16 @@ function AddOn:DidSlotVisualStateChange(slot, beforeState)
     local embShownAfter = slot.muteCatEmbellishmentTexture and slot.muteCatEmbellishmentTexture:IsShown() or false
     local embShadowShownAfter = slot.muteCatEmbellishmentShadow and slot.muteCatEmbellishmentShadow:IsShown() or false
 
-    return beforeState.ilvlShown ~= ilvlShownAfter
-        or beforeState.ilvlText ~= ilvlTextAfter
-        or beforeState.trackShown ~= trackShownAfter
-        or beforeState.trackText ~= trackTextAfter
-        or beforeState.gemShown ~= gemShownAfter
-        or beforeState.gemText ~= gemTextAfter
-        or beforeState.enchShown ~= enchShownAfter
-        or beforeState.enchText ~= enchTextAfter
-        or beforeState.embShown ~= embShownAfter
-        or beforeState.embShadowShown ~= embShadowShownAfter
+    return ilvlShownBefore ~= ilvlShownAfter
+        or ilvlTextBefore ~= ilvlTextAfter
+        or trackShownBefore ~= trackShownAfter
+        or trackTextBefore ~= trackTextAfter
+        or gemShownBefore ~= gemShownAfter
+        or gemTextBefore ~= gemTextAfter
+        or enchShownBefore ~= enchShownAfter
+        or enchTextBefore ~= enchTextAfter
+        or embShownBefore ~= embShownAfter
+        or embShadowShownBefore ~= embShadowShownAfter
 end
 
 function AddOn:EnableGearEvents()
@@ -147,9 +147,6 @@ function AddOn:DisableGearEvents()
     self._fullRefreshQueued = false
     self._fullRefreshIndex = 1
     self._fullRefreshAnyChanged = false
-    if self._fullRefreshSlotList then
-        wipe(self._fullRefreshSlotList)
-    end
 end
 
 ---@return table<number, Slot> slotsByID
@@ -167,24 +164,27 @@ function AddOn:GetGearSlotsByID()
     return self._gearSlotsByID
 end
 
+local reusableCtx = {}
+
 ---@return table ctx
-function AddOn:CreateGearUpdateContext()
+function AddOn:GetGearUpdateContext()
     local profile = self.db.profile
     self._equippedAvgItemLevel = profile.useGradientColorsForILvl and select(2, GetAverageItemLevel()) or nil
 
-    return {
-        profile = profile,
-        showItemLevel = profile.showiLvl,
-        showUpgradeTrack = self:ShouldShowUpgradeTrack(),
-        showGems = self:ShouldShowGems(),
-        showEnchants = self:ShouldShowEnchants(),
-        showEmbellishments = self:ShouldShowEmbellishments(),
-        hideShirtTabardInfo = profile.hideShirtTabardInfo,
-        iLvlTextScale = (profile.iLvlScale and profile.iLvlScale > 0) and profile.iLvlScale or 1,
-        upgradeTrackTextScale = ((profile.upgradeTrackScale and profile.upgradeTrackScale > 0) and profile.upgradeTrackScale or 1) * 0.9,
-        gemScale = (profile.gemScale and profile.gemScale > 0) and profile.gemScale or 1,
-        enchTextScale = ((profile.enchScale and profile.enchScale > 0) and profile.enchScale or 1) * 0.9,
-    }
+    wipe(reusableCtx)
+    reusableCtx.profile = profile
+    reusableCtx.showItemLevel = profile.showiLvl
+    reusableCtx.showUpgradeTrack = self:ShouldShowUpgradeTrack()
+    reusableCtx.showGems = self:ShouldShowGems()
+    reusableCtx.showEnchants = self:ShouldShowEnchants()
+    reusableCtx.showEmbellishments = self:ShouldShowEmbellishments()
+    reusableCtx.hideShirtTabardInfo = profile.hideShirtTabardInfo
+    reusableCtx.iLvlTextScale = (profile.iLvlScale and profile.iLvlScale > 0) and profile.iLvlScale or 1
+    reusableCtx.upgradeTrackTextScale = ((profile.upgradeTrackScale and profile.upgradeTrackScale > 0) and profile.upgradeTrackScale or 1) * 0.9
+    reusableCtx.gemScale = (profile.gemScale and profile.gemScale > 0) and profile.gemScale or 1
+    reusableCtx.enchTextScale = ((profile.enchScale and profile.enchScale > 0) and profile.enchScale or 1) * 0.9
+    
+    return reusableCtx
 end
 
 ---@param slot Slot
@@ -196,13 +196,6 @@ function AddOn:UpdateGearSlot(slot, ctx)
     local enchShownBefore, enchTextBefore = CaptureFontStringState(slot.muteCatEnchant)
     local embShownBefore = slot.muteCatEmbellishmentTexture and slot.muteCatEmbellishmentTexture:IsShown() or false
     local embShadowShownBefore = slot.muteCatEmbellishmentShadow and slot.muteCatEmbellishmentShadow:IsShown() or false
-    local beforeState = {
-        ilvlShown = ilvlShownBefore, ilvlText = ilvlTextBefore,
-        trackShown = trackShownBefore, trackText = trackTextBefore,
-        gemShown = gemShownBefore, gemText = gemTextBefore,
-        enchShown = enchShownBefore, enchText = enchTextBefore,
-        embShown = embShownBefore, embShadowShown = embShadowShownBefore,
-    }
 
     local slotID = slot:GetID()
     local profile = ctx.profile
@@ -281,7 +274,7 @@ function AddOn:UpdateGearSlot(slot, ctx)
         HideRegion(slot.muteCatEnchant)
     end
 
-    return self:DidSlotVisualStateChange(slot, beforeState)
+    return self:DidSlotVisualStateChange(slot, ilvlShownBefore, ilvlTextBefore, trackShownBefore, trackTextBefore, gemShownBefore, gemTextBefore, enchShownBefore, enchTextBefore, embShownBefore, embShadowShownBefore)
 end
 
 ---@param slotIDs table<number, boolean>
@@ -291,7 +284,7 @@ function AddOn:UpdateSelectedGearSlots(slotIDs)
         return
     end
     local slotsByID = self:GetGearSlotsByID()
-    local ctx = self:CreateGearUpdateContext()
+    local ctx = self:GetGearUpdateContext()
     local anyChanged = false
     for slotID in pairs(slotIDs) do
         local slot = slotsByID[slotID]
@@ -327,11 +320,13 @@ function AddOn:QueueFullGearRefresh()
         return
     end
 
-    self._fullRefreshSlotList = self._fullRefreshSlotList or {}
-    wipe(self._fullRefreshSlotList)
-    for _, slot in ipairs(self.GearSlots) do
-        self._fullRefreshSlotList[#self._fullRefreshSlotList + 1] = slot:GetID()
+    if not self._fullRefreshSlotList or #self._fullRefreshSlotList == 0 then
+        self._fullRefreshSlotList = {}
+        for _, slot in ipairs(self.GearSlots) do
+            self._fullRefreshSlotList[#self._fullRefreshSlotList + 1] = slot:GetID()
+        end
     end
+
     self._fullRefreshIndex = 1
     self._fullRefreshAnyChanged = false
 
@@ -362,7 +357,7 @@ function AddOn:ProcessQueuedFullGearRefresh()
     end
 
     local slotsByID = self:GetGearSlotsByID()
-    local ctx = self:CreateGearUpdateContext()
+    local ctx = self:GetGearUpdateContext()
     local endIdx = math.min(idx + FULL_REFRESH_SLOTS_PER_TICK - 1, #slotList)
     for i = idx, endIdx do
         local slot = slotsByID[slotList[i]]
@@ -636,25 +631,13 @@ function AddOn:OnInitialize()
     hooksecurefunc(CharacterFrame, "RefreshDisplay", function()
             if not IsPaperDollVisible() then return end
             self:CheckIfTimerunner()
-            self:AdjustCharacterInfoWindowSize()
             self:QueueHeaderStyling()
         end)
     hooksecurefunc("PaperDollFrame_UpdateStats", function()
         if not IsPaperDollVisible() then return end
         self:StyleBlizzardItemLevelClassColor()
     end)
-    hooksecurefunc(CharacterModelScene, "TransitionToModelSceneID", function(cms, sceneID)
-        if sceneID == 595 and IsPaperDollVisible() and self.db.profile.increaseCharacterInfoSize then
-            local actor = cms:GetPlayerActor()
-            DebugPrint("CMS Transition: requested scale before mod - ", actor:GetRequestedScale())
-            actor:SetRequestedScale(actor:GetRequestedScale() * 0.8)
-            actor:UpdateScale()
-            DebugPrint("Updated requested scale to", actor:GetRequestedScale())
-            local posX, posY, posZ = actor:GetPosition()
-            -- Apply an offset so more of the model is visible (feet are not covered).
-            actor:SetPosition(posX, posY, posZ + 0.25)
-        end
-    end)
+    -- Hook removed for CharacterModelScene
     hooksecurefunc("PaperDollItemSlotButton_Update", function(button)
         if not IsPaperDollVisible() then return end
         if not button or not button.GetID then return end
@@ -664,31 +647,6 @@ function AddOn:OnInitialize()
         end
         self:QueueSlotButtonUpdate(slotID)
     end)
-end
-
----Handles changing the Character Info window size when the option to use the larger character window is checked
-function AddOn:AdjustCharacterInfoWindowSize()
-    DebugPrint("AdjustCharacterInfoWindowSize - Using default Blizzard layout")
-    if not IsPaperDollVisible() then
-        return
-    end
-
-    -- Always keep Blizzard default sizing/anchors.
-    local charFrameInsetBotRightXOffset = select(4, CharacterFrameInset:GetPointByName("BOTTOMRIGHT"))
-    local charModelSceneBotRight = CharacterModelScene:GetPointByName("BOTTOMRIGHT")
-    local charMainHandSlotBotLeftXOffset = select(4, CharacterMainHandSlot:GetPointByName("BOTTOMLEFT"))
-    if CharacterFrame:GetWidth() ~= CHARACTERFRAME_EXPANDED_WIDTH then CharacterFrame:SetWidth(CHARACTERFRAME_EXPANDED_WIDTH) end
-    if charFrameInsetBotRightXOffset ~= 32 then CharacterFrameInset:SetPoint("BOTTOMRIGHT", CharacterFrame, "BOTTOMLEFT", 332, 4) end
-    if charModelSceneBotRight then CharacterModelScene:ClearPoint("BOTTOMRIGHT") end
-    if charMainHandSlotBotLeftXOffset ~= 130 then CharacterMainHandSlot:SetPoint("BOTTOMLEFT", PaperDollItemsFrame, "BOTTOMLEFT", 130, 16) end
-    if CharacterModelFrameBackgroundTopLeft and CharacterModelFrameBackgroundTopLeft:GetWidth() ~= 212 then CharacterModelFrameBackgroundTopLeft:SetWidth(212) end
-    if CharacterModelFrameBackgroundBotLeft and CharacterModelFrameBackgroundBotLeft:GetWidth() ~= 212 then CharacterModelFrameBackgroundBotLeft:SetWidth(212) end
-    if CharacterModelScene:GetPlayerActor() then
-        local actor = CharacterModelScene:GetPlayerActor()
-        if actor:GetRequestedScale() then actor.requestedScale = nil end
-        actor:UpdateScale()
-        if select(3, actor:GetPosition()) > 1.25 then actor:SetPosition(0, 0, select(3, actor:GetPosition()) - 0.25) end
-    end
 end
 
 ---Handles changes to equipped gear or AddOn settings when the Character Info window is visible

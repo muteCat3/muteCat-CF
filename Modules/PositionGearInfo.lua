@@ -107,7 +107,7 @@ function AddOn:SetGemsPositionBySlot(slot)
     -- Gems on weapon/shield/off-hand slots (not possible as far as I am aware, but you never know)
     if enchantShown and slot.IsLeftSide ~= nil then
         SetPointCached(slot.muteCatGems, slot.IsLeftSide and "LEFT" or "RIGHT", slot.muteCatEnchant, slot.IsLeftSide and "RIGHT" or "LEFT", slot.IsLeftSide and 4 or -4, 0)
-    elseif itemLevelShown and slot.IsLeftSide ~= nil and slot.muteCatGems and slot.muteCatGems:IsShown() then
+    elseif itemLevelShown and slot.IsLeftSide ~= nil and gemsShown then
         SetPointCached(slot.muteCatItemLevel, slot.IsLeftSide and "LEFT" or "RIGHT", slot, slot.IsLeftSide and "RIGHT" or "LEFT", (slot.IsLeftSide and 1 or -1) * 10, slot.muteCatItemLevel:GetHeight() / 1.5)
         SetPointCached(slot.muteCatGems, slot.IsLeftSide and "LEFT" or "RIGHT", slot, slot.IsLeftSide and "RIGHT" or "LEFT", (slot.IsLeftSide and 1 or -1) * 10, (slot.muteCatItemLevel:GetHeight() / 1.5) * -1)
     elseif upgradeTrackShown and slot.IsLeftSide == nil then
