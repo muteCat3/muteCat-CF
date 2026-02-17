@@ -124,7 +124,7 @@ AddOn.ExpansionInfo = {
             CharacterMainHandSlot,
             CharacterSecondaryHandSlot
         },
-        HeadEnchantAvailable = true,
+        HeadEnchantAvailable = false,
         ShieldEnchantAvailable = true,
         OffhandEnchantAvailable = true
     }
