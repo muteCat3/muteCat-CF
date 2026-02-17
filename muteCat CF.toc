@@ -3,7 +3,7 @@
 ## Notes: Displays useful information about equipped gear in the Character Info window
 ## IconTexture: Interface/Icons/INV_Chest_Plate08
 ## Author: muteCat
-## Version: 1.12.0
+## Version: 1.14.0
 ## SavedVariables: muteCatCFDB
 ## Category: User Interface
 ## OptionalDeps: Blizzard_CharacterUI
@@ -17,6 +17,6 @@ embeds.xml
 Constants.lua
 Utils.lua
 muteCatCF.lua
-Modules\EnchantData.lua
+Modules\GemData.lua
 Modules\RetrieveGearInfo.lua
 Modules\PositionGearInfo.lua

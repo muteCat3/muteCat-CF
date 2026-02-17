@@ -21,7 +21,7 @@ local function ResolveCurrentLevelCap()
     return nil
 end
 
-AddOn.CurrentExpac = AddOn.ExpansionInfo.TheWarWithin
+AddOn.CurrentExpac = AddOn.ExpansionInfo.Midnight
 local resolvedLevelCap = ResolveCurrentLevelCap()
 if resolvedLevelCap then
     AddOn.CurrentExpac.LevelCap = resolvedLevelCap

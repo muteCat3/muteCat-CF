@@ -1,23 +1,11 @@
-local addonName, AddOn = ...
+local MAJOR, MINOR = "LibEnchantData-MIDNIGHT-1.0", 1
+local lib = LibStub:NewLibrary(MAJOR, MINOR)
 
--- Ensure we are writing to the AceAddon object, not just the private table
-AddOn = LibStub("AceAddon-3.0"):GetAddon(addonName)
+if not lib then return end
 
--- Map Enchant ID (from item link) to Spell ID (for Icon) or Texture ID/Path
--- Based on TWW / Midnight 12.0.1 data
-AddOn.EnchantIDToTextureID = {
-    -- Death Knight Runeforging
-    [3368] = 53344,    -- Rune of the Fallen Crusader
-    [3369] = 53341,    -- Rune of Cinderglacier
-    [3370] = 53343,    -- Rune of Razorice
-    [3847] = 62158,    -- Rune of the Stoneskin Gargoyle
-    [6241] = 327361,   -- Rune of the Apocalypse
-    [6242] = 327362,   -- Rune of Unending Thirst
-    [6243] = 327363,   -- Rune of Spellwarding
-    [6244] = 327364,   -- Rune of Sanguination
-    [6245] = 327365,   -- Rune of Hysteria
-
-    -- Midnight Leg Enchants
+-- Base de données interne
+local enchantData = {
+-- --- LEG ENCHANTS (Jambières) ---
     [7935] = 1229442, -- Sunfire Silk Spellthread
     [7937] = 1229454, -- Arcanoweave Spellthread
     [7939] = 1229457, -- Bright Linen Spellthread
@@ -25,13 +13,13 @@ AddOn.EnchantIDToTextureID = {
     [8161] = 1243978, -- Thalassian Scout Armor Kit
     [8163] = 1243980, -- Blood Knight's Armor Kit
 
-    -- Midnight Chest Enchants
+    -- --- CHEST ENCHANTS (Torse) ---
     [7957] = 1236054, -- Mark of Nalorakk
     [7985] = 1236068, -- Mark of the Rootwarden
     [7987] = 1236069, -- Mark of the Worldsoul
     [8013] = 1236082, -- Mark of the Magister
 
-    -- Midnight Helm Enchants
+    -- --- HELM ENCHANTS (Tête) ---
     [7959] = 1236055, -- Enchant Helm - Hex of Leeching
     [7961] = 1236056, -- Enchant Helm - Empowered Hex of Leeching
     [7989] = 1236070, -- Enchant Helm - Blessing of Speed
@@ -39,12 +27,12 @@ AddOn.EnchantIDToTextureID = {
     [8015] = 1236083, -- Enchant Helm - Rune of Avoidance
     [8017] = 1236084, -- Enchant Helm - Empowered Rune of Avoidance
 
-    -- Midnight Boots Enchants
+    -- --- BOOTS ENCHANTS (Bottes) ---
     [7963] = 1236057, -- Lynx's Dexterity
     [7993] = 1236072, -- Shaladrassil's Roots
     [8019] = 1236085, -- Farstrider's Hunt
 
-    -- Midnight Ring Enchants
+    -- --- RING ENCHANTS (Anneau) ---
     [7965] = 1236058, -- Enchant Ring - Amani Mastery
     [7967] = 1236059, -- Enchant Ring - Eyes of the Eagle
     [7969] = 1236060, -- Enchant Ring - Zul'jin's Mastery
@@ -55,7 +43,7 @@ AddOn.EnchantIDToTextureID = {
     [8025] = 1236088, -- Enchant Ring - Silvermoon's Alacrity
     [8027] = 1236089, -- Enchant Ring - Silvermoon's Tenacity
 
-    -- Midnight Shoulder Enchants
+    -- --- SHOULDER ENCHANTS (Épaules) ---
     [7971] = 1236061, -- Enchant Shoulders - Flight of the Eagle
     [7973] = 1236062, -- Enchant Shoulders - Akil'zon's Celerity
     [7999] = 1236075, -- Enchant Shoulders - Nature's Grace
@@ -63,7 +51,7 @@ AddOn.EnchantIDToTextureID = {
     [8029] = 1236090, -- Enchant Shoulders - Thalassian Recovery
     [8031] = 1236091, -- Enchant Shoulders - Silvermoon's Mending
 
-    -- Midnight Weapon Enchants
+    -- --- WEAPON ENCHANTS (Armes) ---
     [7979] = 1236065, -- Enchant Weapon - Strength of Halazzi
     [7981] = 1236066, -- Enchant Weapon - Jan'alai's Precision
     [7983] = 1236067, -- Enchant Weapon - Berserker's Rage
@@ -74,11 +62,49 @@ AddOn.EnchantIDToTextureID = {
     [8039] = 1236095, -- Enchant Weapon - Acuity of the Ren'dorei
     [8041] = 1236097, -- Enchant Weapon - Arcane Mastery
 
-    -- Midnight Profession Tool Enchants
+    -- --- PROFESSION TOOL ENCHANTS (Outils) ---
     [7975] = 1236063, -- Enchant Tool - Amani Perception
     [7977] = 1236064, -- Enchant Tool - Amani Resourcefulness
-    [8003] = 1236077, -- Enchant Tool - Haranir Finesse
+    [8003] = 1236077, -- Enchant Tool - Haranir Finesse 
     [8005] = 1236078, -- Enchant Tool - Haranir Multicrafting
     [8033] = 1236092, -- Enchant Tool - Sin'dorei Deftness
     [8035] = 1236093, -- Enchant Tool - Ren'dorei Ingenuity
-}
+
+    -- --- DEATH KNIGHT RUNES (Evergreen) ---
+    [3368] = 53344,    -- Rune of the Fallen Crusader
+    [3369] = 53341,    -- Rune of Cinderglacier
+    [3370] = 53343,    -- Rune of Razorice
+    [3847] = 62158,    -- Rune of the Stoneskin Gargoyle
+    [6241] = 327361,   -- Rune of the Apocalypse
+    [6242] = 327362,   -- Rune of Unending Thirst
+    [6243] = 327363,   -- Rune of Spellwarding
+    [6244] = 327364,   -- Rune of Sanguination
+    [6245] = 327365,   -- Rune of Hysteria
+    }
+
+-- --- API Publique de la Librairie ---
+
+-- Retourne le Spell ID associé à un Enchant ID
+-- @param enchantID (number) : L'ID de l'enchantement sur l'item
+-- @return spellID (number|nil)
+function lib:GetSpellID(enchantID)
+    return enchantData[enchantID]
+end
+
+-- Retourne le premier Enchant ID trouvé pour un Spell ID donné (Recherche inversée)
+-- Note : Comme 3 rangs partagent souvent le même SpellID, cela retournera n'importe lequel des rangs (souvent le R1).
+-- @param spellID (number)
+-- @return enchantID (number|nil)
+function lib:GetEnchantID(spellID)
+    for eid, sid in pairs(enchantData) do
+        if sid == spellID then
+            return eid
+        end
+    end
+    return nil
+end
+
+-- Retourne toute la table des données (pour itération)
+function lib:GetAllEnchants()
+    return enchantData
+end

@@ -1,0 +1,7 @@
+## Interface: 100207
+## Title: Lib: Enchant Data (MIDNIGHT)
+## Notes: Data library for enchanting IDs.
+## Author: Yumidwarf
+## Version: 1.0
+
+LibEnchantData-MIDNIGHT-1.0.lua

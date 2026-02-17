@@ -83,24 +83,7 @@ local function GetEnchantIDFromLink(itemLink)
     return tonumber(enchantID)
 end
 
-local function GetDKEnchantTextureID(self, enchText)
-    if enchText == self.DKEnchantAbbr.Razorice or enchText == L["Rune of Razorice"] then
-        return 135842 -- Interface/Icons/Spell_Frost_FrostArmor
-    elseif enchText == self.DKEnchantAbbr.Sanguination or enchText == L["Rune of Sanguination"] then
-        return 1778226 -- Interface/Icons/Ability_Argus_DeathFod
-    elseif enchText == self.DKEnchantAbbr.Spellwarding or enchText == L["Rune of Spellwarding"] then
-        return 425952 -- Interface/Icons/Spell_Fire_TwilightFireward
-    elseif enchText == self.DKEnchantAbbr.Apocalypse or enchText == L["Rune of the Apocalypse"] then
-        return 237535 -- Interface/Icons/Spell_DeathKnight_Thrash_Ghoul
-    elseif enchText == self.DKEnchantAbbr.FallenCrusader or enchText == L["Rune of the Fallen Crusader"] then
-        return 135957 -- Interface/Icons/Spell_Holy_RetributionAura
-    elseif enchText == self.DKEnchantAbbr.StoneskinGargoyle or enchText == L["Rune of the Stoneskin Gargoyle"] then
-        return 237480 -- Interface/Icons/Inv_Sword_130
-    elseif enchText == self.DKEnchantAbbr.UnendingThirst or enchText == L["Rune of Unending Thirst"] then
-        return 3163621 -- Interface/Icons/Spell_NZInsanity_Bloodthirst
-    end
-    return nil
-end
+
 
 ---@param trackText string
 ---@return string|nil
@@ -252,28 +235,35 @@ function AddOn:GetGemsBySlot(slot)
         if lines then
             for _, ttdata in ipairs(lines) do
                 if ttdata and ttdata.type and ttdata.type == self.TooltipDataType.Gem then
+                    -- Record discovered gem if applicable
+                    if ttdata.gemIcon and ttdata.leftText then
+                        self:SniffGem(ttdata.gemIcon, ttdata.leftText)
+                    end
                     -- Socketed item will have gemIcon variable
+                    local gemIconScale = self.db.profile.gemScale or 1
+                    local gemIconSize = gemIconScale * 15
+                    
                     if ttdata.gemIcon and isLeftSide then
-                        DebugPrint("Found Gem Icon on left side slot:", ColorText(slot:GetID(), "Heirloom"), ttdata.gemIcon, self.GetTextureString(ttdata.gemIcon))
-                        gemText = gemText..self.GetTextureString(ttdata.gemIcon)
+                        DebugPrint("Found Gem Icon on left side slot:", ColorText(slot:GetID(), "Heirloom"), ttdata.gemIcon, self.GetTextureString(ttdata.gemIcon, gemIconSize))
+                        gemText = gemText..self.GetTextureString(ttdata.gemIcon, gemIconSize)
                     elseif ttdata.gemIcon then
-                        DebugPrint("Found Gem Icon:", ColorText(slot:GetID(), "Heirloom"), ttdata.gemIcon, self.GetTextureString(ttdata.gemIcon))
-                        gemText = self.GetTextureString(ttdata.gemIcon)..gemText
+                        DebugPrint("Found Gem Icon:", ColorText(slot:GetID(), "Heirloom"), ttdata.gemIcon, self.GetTextureString(ttdata.gemIcon, gemIconSize))
+                        gemText = self.GetTextureString(ttdata.gemIcon, gemIconSize)..gemText
                     -- Two conditions below check for tinker sockets
                     elseif ttdata.socketType and isLeftSide then
-                        DebugPrint("Empty tinker socket for in slot on left side:", ColorText(slot:GetID(), "Heirloom"), self.GetTextureString("Interface/ItemSocketingFrame/UI-EmptySocket-"..ttdata.socketType))
-                        gemText = gemText..self.GetTextureString("Interface/ItemSocketingFrame/UI-EmptySocket-"..ttdata.socketType)
+                        DebugPrint("Empty tinker socket for in slot on left side:", ColorText(slot:GetID(), "Heirloom"), self.GetTextureString("Interface/ItemSocketingFrame/UI-EmptySocket-"..ttdata.socketType, gemIconSize))
+                        gemText = gemText..self.GetTextureString("Interface/ItemSocketingFrame/UI-EmptySocket-"..ttdata.socketType, gemIconSize)
                     elseif ttdata.socketType then
-                        DebugPrint("Empty tinker socket found in slot:", ColorText(slot:GetID(), "Heirloom"), self.GetTextureString("Interface/ItemSocketingFrame/UI-EmptySocket-"..ttdata.socketType))
-                        gemText = self.GetTextureString("Interface/ItemSocketingFrame/UI-EmptySocket-"..ttdata.socketType)..gemText
+                        DebugPrint("Empty tinker socket found in slot:", ColorText(slot:GetID(), "Heirloom"), self.GetTextureString("Interface/ItemSocketingFrame/UI-EmptySocket-"..ttdata.socketType, gemIconSize))
+                        gemText = self.GetTextureString("Interface/ItemSocketingFrame/UI-EmptySocket-"..ttdata.socketType, gemIconSize)..gemText
                     -- The two conditions below indicate that there is an empty socket on the item
                     elseif isLeftSide then
-                        DebugPrint("Empty socket found in slot on left side:", ColorText(slot:GetID(), "Heirloom"), self.GetTextureString(458977))
+                        DebugPrint("Empty socket found in slot on left side:", ColorText(slot:GetID(), "Heirloom"), self.GetTextureString(458977, gemIconSize))
                         -- Texture: Interface/ItemSocketingFrame/UI-EmptySocket-Prismatic
-                        gemText = gemText..self.GetTextureString(458977)
+                        gemText = gemText..self.GetTextureString(458977, gemIconSize)
                     else
-                        DebugPrint("Empty socket found in slot:", ColorText(slot:GetID(), "Heirloom"), self.GetTextureString(458977))
-                        gemText = self.GetTextureString(458977)..gemText
+                        DebugPrint("Empty socket found in slot:", ColorText(slot:GetID(), "Heirloom"), self.GetTextureString(458977, gemIconSize))
+                        gemText = self.GetTextureString(458977, gemIconSize)..gemText
                     end
                     existingSocketCount = existingSocketCount + 1
                 end
@@ -301,7 +291,6 @@ end
 ---If an item that can be enchanted isn't and the option to show missing enchants is enabled, this will also be indicated in the formatted text.
 ---@param slot Slot The gear slot to get gem information for
 function AddOn:GetEnchantmentBySlot(slot)
-    self:EnsureTextReplacementTables()
     if not IsPlayerMaxLevelOrHide(self, slot.muteCatEnchant) then
         return
     end
@@ -315,62 +304,23 @@ function AddOn:GetEnchantmentBySlot(slot)
         if lines then
             for _, ttdata in ipairs(lines) do
                 if ttdata and ttdata.type and ttdata.type == self.TooltipDataType.Enchant then
-                    DebugPrint("Item in slot", ColorText(slot:GetID(), "Heirloom"), "is enchanted")
+                     local texture
+                    -- Always prioritize quality rank detection (Tier 1, 2, or 3) from the tooltip text
+                    local qualityTier = ttdata.leftText and ttdata.leftText:match("Tier(%d)")
+                    local enchIconSize = (self.db.profile.enchScale or 1) * 15 -- Back to standard base size
                     
-                    local texture
-                    local enchantID = GetEnchantIDFromLink(item:GetItemLink())
-                    if enchantID and AddOn.EnchantIDToTextureID[enchantID] then
-                        local mappedValue = AddOn.EnchantIDToTextureID[enchantID]
-                        
-                        if type(mappedValue) == "number" then
-                            -- Assume Spell ID, get icon from spell
-                            texture = C_Spell and C_Spell.GetSpellTexture(mappedValue) or GetSpellTexture(mappedValue)
-                            
-                            -- Fallback if GetSpellTexture fails but we have a number (could be raw FileID)
-                            if not texture then
-                                 texture = mappedValue
-                            end
-                            texture = self.GetTextureString(texture)
-                        else
-                             -- Assume Atlas or Texture Path string
-                             texture = self.GetTextureAtlasString(mappedValue)
-                        end
-                         DebugPrint("Enchant found via ID:", ColorText(enchantID, "Heirloom"), "->", texture)
+                    if qualityTier then
+                        texture = self.GetTextureAtlasString("Professions-Icon-Quality-Tier" .. qualityTier, enchIconSize)
+                        DebugPrint("Enchant quality detected:", ColorText("Tier " .. qualityTier, "Heirloom"))
                     end
 
-                    local enchText = ttdata.leftText
-                    enchText = strtrim(enchText or "")
-                    
                     if not texture then
-                        -- Fallback: Text Parsing
-                        if enchText:sub(1, 1) == "+" then
-                            enchText = strtrim(enchText:sub(2))
-                        end
-                        if L["Enchanted: "] and enchText:find(L["Enchanted: "], 1, true) == 1 then
-                            enchText = strtrim(enchText:sub(#L["Enchanted: "] + 1))
-                        end
-
-                        -- Keep icon-only output: prefer embedded atlas; fallback to DK rune icon; else generic check.
-                        local atlas = enchText:match("|A:(.-):")
-                        if not atlas then
-                            local textureID = GetDKEnchantTextureID(self, enchText)
-                            if textureID then
-                                texture = self.GetTextureString(textureID)
-                            else
-                                texture = self.GetTextureString(628564) -- Interface/Scenarios/ScenarioIcon-Check
-                            end
-                        else
-                            texture = self.GetTextureAtlasString(atlas)
-                        end
+                        -- Falls kein Qualitätsrang gefunden wurde (Legacy), nutzen wir das Häkchen
+                        texture = self.GetTextureString(628564, enchIconSize)
                     end
-                    
-                    DebugPrint("Enchant icon text:", ColorText(texture, "Uncommon"))
     
-                    if self.db.profile.useCustomColorForEnchants then
-                        slot.muteCatEnchant:SetFormattedText(ColorText(texture, self.db.profile.enchCustomColor))
-                    else
-                        slot.muteCatEnchant:SetFormattedText(ColorText(texture, "Uncommon"))
-                    end
+                    local color = self.db.profile.useCustomColorForEnchants and self.db.profile.enchCustomColor or "Uncommon"
+                    slot.muteCatEnchant:SetFormattedText(ColorText(texture, color))
                     slot.muteCatEnchant:Show()
                     isEnchanted = true
                     break

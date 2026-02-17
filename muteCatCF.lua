@@ -47,31 +47,31 @@ local DBDefaults = {
         iLvlOnItem = false,
         showEmbellishments = true,
         hideShirtTabardInfo = false,
-        increaseCharacterInfoSize = false,
-    }
+        discoveredGems = {},
+    },
 }
 
 
--- Temporarily using for Timerunning characters
+-- Handles special scaling/gear logic for Timerunning/Remix characters (e.g., MoP Remix)
 function AddOn:CheckIfTimerunner()
     local timerunningID = PlayerGetTimerunningSeasonID()
     self.IsTimerunner = timerunningID ~= nil
 end
 
 function AddOn:ShouldShowGems()
-    return self.db.profile.showGems and not self.IsTimerunner
+    return self.db.profile.showGems and not self.IsTimerunner and self:IsPlayerMaxLevel()
 end
 
 function AddOn:ShouldShowEnchants()
-    return self.db.profile.showEnchants and not self.IsTimerunner
+    return self.db.profile.showEnchants and not self.IsTimerunner and self:IsPlayerMaxLevel()
 end
 
 function AddOn:ShouldShowEmbellishments()
-    return self.db.profile.showEmbellishments and not self.IsTimerunner
+    return self.db.profile.showEmbellishments and not self.IsTimerunner and self:IsPlayerMaxLevel()
 end
 
 function AddOn:ShouldShowUpgradeTrack()
-    return self.db.profile.showUpgradeTrack and not self.IsTimerunner
+    return self.db.profile.showUpgradeTrack and not self.IsTimerunner and self:IsPlayerMaxLevel()
 end
 
 function AddOn:ApplyHeaderStyling()
