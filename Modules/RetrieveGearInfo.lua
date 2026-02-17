@@ -5,7 +5,22 @@ local L = AddOn.L
 
 local DebugPrint = AddOn.DebugPrint
 local ColorText = AddOn.ColorText
+local DebugPrint = AddOn.DebugPrint
+
+-- Optimization: Localize Blizzard Globals
+local C_Item = _G.C_Item
+local C_TooltipInfo = _G.C_TooltipInfo
+local C_Timer = _G.C_Timer
+local PaperDollFrame = _G.PaperDollFrame
+local GetAverageItemLevel = _G.GetAverageItemLevel
+local select = _G.select
+local tonumber = _G.tonumber
+local tostring = _G.tostring
+local ipairs = _G.ipairs
+local pairs = _G.pairs
+
 local MAX_ITEMLEVEL_RETRIES = 6
+
 
 local function HideRegion(region)
     if region then

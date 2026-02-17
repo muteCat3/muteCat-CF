@@ -2,8 +2,19 @@ local addonName, AddOn = ...
 ---@class muteCatCF: AceAddon, AceConsole-3.0, AceEvent-3.0
 AddOn = LibStub("AceAddon-3.0"):GetAddon(addonName)
 
-local DebugPrint = AddOn.DebugPrint
 local ColorText = AddOn.ColorText
+local DebugPrint = AddOn.DebugPrint
+
+-- Optimization: Localize Blizzard Globals
+local C_Timer = _G.C_Timer
+local PaperDollFrame = _G.PaperDollFrame
+local CharacterFrame = _G.CharacterFrame
+local GetAverageItemLevel = _G.GetAverageItemLevel
+local UnitLevel = _G.UnitLevel
+local GetInventoryItemLink = _G.GetInventoryItemLink
+local PaperDollFrame_UpdateStats = _G.PaperDollFrame_UpdateStats
+local PlayerGetTimerunningSeasonID = _G.PlayerGetTimerunningSeasonID
+
 local FULL_REFRESH_SLOTS_PER_TICK = 4
 
 local function IsPaperDollVisible()
@@ -65,7 +76,6 @@ function AddOn:ShouldShowEnchants()
     return self.db.profile.showEnchants and not self.IsTimerunner and self:IsPlayerMaxLevel()
 end
 
-
 function AddOn:ShouldShowUpgradeTrack()
     return self.db.profile.showUpgradeTrack and not self.IsTimerunner and self:IsPlayerMaxLevel()
 end
@@ -104,8 +114,6 @@ function AddOn:DidSlotVisualStateChange(slot, ilvlShownBefore, ilvlTextBefore, t
     local trackShownAfter, trackTextAfter = CaptureFontStringState(slot.muteCatUpgradeTrack)
     local gemShownAfter, gemTextAfter = CaptureFontStringState(slot.muteCatGems)
     local enchShownAfter, enchTextAfter = CaptureFontStringState(slot.muteCatEnchant)
-
-
     return ilvlShownBefore ~= ilvlShownAfter
         or ilvlTextBefore ~= ilvlTextAfter
         or trackShownBefore ~= trackShownAfter
@@ -114,7 +122,6 @@ function AddOn:DidSlotVisualStateChange(slot, ilvlShownBefore, ilvlTextBefore, t
         or gemTextBefore ~= gemTextAfter
         or enchShownBefore ~= enchShownAfter
         or enchTextBefore ~= enchTextAfter
-
 end
 
 function AddOn:EnableGearEvents()
@@ -188,7 +195,6 @@ function AddOn:UpdateGearSlot(slot, ctx)
     local trackShownBefore, trackTextBefore = CaptureFontStringState(slot.muteCatUpgradeTrack)
     local gemShownBefore, gemTextBefore = CaptureFontStringState(slot.muteCatGems)
     local enchShownBefore, enchTextBefore = CaptureFontStringState(slot.muteCatEnchant)
-
 
     local slotID = slot:GetID()
     local profile = ctx.profile
