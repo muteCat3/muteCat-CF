@@ -1,13 +1,18 @@
+--------------------------------------------------------------------------------
+-- muteCat CF - RetrieveGearInfo
+-- Core logic for scanning equipment tooltips and extracting iLvl, Gems, and Enchants.
+--------------------------------------------------------------------------------
+
 local addonName, AddOn = ...
 ---@class muteCatCF: AceAddon, AceConsole-3.0, AceEvent-3.0
 AddOn = LibStub("AceAddon-3.0"):GetAddon(addonName)
 local L = AddOn.L
 
+-- Localization & Utilities
 local DebugPrint = AddOn.DebugPrint
 local ColorText = AddOn.ColorText
-local DebugPrint = AddOn.DebugPrint
 
--- Optimization: Localize Blizzard Globals
+-- Optimization: Localize Blizzard Globals for performance in frequent update loops
 local C_Item = _G.C_Item
 local C_TooltipInfo = _G.C_TooltipInfo
 local C_Timer = _G.C_Timer
@@ -17,50 +22,49 @@ local select = _G.select
 local tonumber = _G.tonumber
 local tostring = _G.tostring
 local ipairs = _G.ipairs
-local pairs = _G.pairs
 
+-- Internal Constants
 local MAX_ITEMLEVEL_RETRIES = 6
 
-
+---Hides a UI region if it is currently shown.
+---@param region Region?
 local function HideRegion(region)
-    if region then
+    if region and region.IsShown and region:IsShown() then
         region:Hide()
     end
 end
 
+---Clears the retry state for a specific slot ID.
+---@param self muteCatCF
+---@param slotID number
 local function ClearItemLevelRetry(self, slotID)
-    if self._pendingItemLevelRetry then
-        self._pendingItemLevelRetry[slotID] = nil
-    end
-    if self._itemLevelRetryCount then
-        self._itemLevelRetryCount[slotID] = nil
-    end
+    if self._pendingItemLevelRetry then self._pendingItemLevelRetry[slotID] = nil end
+    if self._itemLevelRetryCount then self._itemLevelRetryCount[slotID] = nil end
 end
 
+---Checks if the player is at max level, otherwise hides the provided region.
 ---@param self muteCatCF
 ---@param region Region?
 ---@return boolean
 local function IsPlayerMaxLevelOrHide(self, region)
-    if self:IsPlayerMaxLevel() then
-        return true
-    end
+    if self:IsPlayerMaxLevel() then return true end
     HideRegion(region)
     return false
 end
 
+---Retrieves and caches tooltip lines for a given item link.
+---@param self muteCatCF
+---@param itemLink string
+---@return table|nil
 local function GetTooltipLinesCached(self, itemLink)
-    if not itemLink or itemLink == "" then
-        return nil
-    end
+    if not itemLink or itemLink == "" then return nil end
 
     self._tooltipLineCache = self._tooltipLineCache or {}
     self._tooltipCacheSize = self._tooltipCacheSize or 0
     local cached = self._tooltipLineCache[itemLink]
-    if cached ~= nil then
-        return cached ~= false and cached or nil
-    end
+    if cached ~= nil then return cached ~= false and cached or nil end
 
-    -- Keep cache bounded to avoid step-wise memory growth on repeated open/close cycles.
+    -- Purge cache if it gets too large (avoid memory leaks)
     if self._tooltipCacheSize >= 128 then
         self._tooltipLineCache = {}
         self._tooltipCacheSize = 0
@@ -73,6 +77,9 @@ local function GetTooltipLinesCached(self, itemLink)
     return lines
 end
 
+---Checks if a tooltip line indicates an upgrade track.
+---@param text string?
+---@return boolean
 local function IsUpgradeTrackLine(text)
     if not text or text == "" then return false end
     return text:find(L["Upgrade Level: "], 1, true)
@@ -84,6 +91,9 @@ local function IsUpgradeTrackLine(text)
         or text:find(L["Myth "], 1, true)
 end
 
+---Checks if an item is at its maximum upgrade progress.
+---@param text string?
+---@return boolean
 local function IsMaxUpgradeTrackProgress(text)
     if not text or text == "" then return false end
     local current, max = text:match("(%d+)%s*/%s*(%d+)")
@@ -91,26 +101,26 @@ local function IsMaxUpgradeTrackProgress(text)
     return tonumber(current) == tonumber(max) and tonumber(max) > 0
 end
 
+---Extracts the enchantment ID from an item link using native Midnight patterns.
+---@param itemLink string?
+---@return number|nil
 local function GetEnchantIDFromLink(itemLink)
     if not itemLink then return nil end
-    -- Item Link Structure: item:itemID:enchantID:gemID1:gemID2:gemID3:gemID4:suffixID:uniqueID:linkLevel:specializationID:upgradeTypeID:instanceDifficultyID:numBonusIDs:bonusID1:bonusID2...
     local enchantID = itemLink:match("item:%d+:(%d+):")
     return tonumber(enchantID)
 end
 
-
-
----@param trackText string
+---Returns the hex color code for a specific upgrade track tier.
+---@param self muteCatCF
+---@param trackText string?
 ---@return string|nil
 local function GetUpgradeTrackTierColor(self, trackText)
-    if not trackText or trackText == "" then
-        return nil
-    end
+    if not trackText or trackText == "" then return nil end
 
     local tier = trackText:match("^%s*([EAVCHM])")
     if not tier then return nil end
 
-    -- Lazy initialization of the lookup table
+    -- Lazy load color map
     if not self._upgradeTrackColorMap then
         self._upgradeTrackColorMap = {
             E = self.HexColorPresets.Priest,
@@ -125,17 +135,23 @@ local function GetUpgradeTrackTierColor(self, trackText)
     return self._upgradeTrackColorMap[tier]
 end
 
----Fetches and formats the item level for an item in the defined gear slot (if one exists)
----@param slot Slot The gear slot to get item level for
+--------------------------------------------------------------------------------
+-- Public API Functions
+--------------------------------------------------------------------------------
+
+---Retrieves and processes the item level for a slot.
+---@param slot Slot
 function AddOn:GetItemLevelBySlot(slot)
     local slotID = slot:GetID()
     local hasItem, item = self:IsItemEquippedInSlot(slot)
     if hasItem then
         local itemLevel = item:GetCurrentItemLevel() or 0
 
-        if itemLevel > 0 then -- positive value indicates item info has loaded
+        if itemLevel > 0 then
             ClearItemLevelRetry(self, slotID)
             local iLvlText = tostring(itemLevel)
+            
+            -- Color Logic
             if self.db.profile.useGradientColorsForILvl then
                 local equippedItemLevel = self._equippedAvgItemLevel or select(2, GetAverageItemLevel())
                 local color = (itemLevel < equippedItemLevel - 10 and "Error"
@@ -147,38 +163,34 @@ function AddOn:GetItemLevelBySlot(slot)
                 iLvlText = "|c"..qualityHex..iLvlText.."|r"
             elseif self.db.profile.useClassColorForILvl then
                 local classHexWithAlpha = self:GetPlayerClassColorHexWithAlpha()
-                if classHexWithAlpha then
-                    iLvlText = "|c"..classHexWithAlpha..iLvlText.."|r"
-                end
+                if classHexWithAlpha then iLvlText = "|c"..classHexWithAlpha..iLvlText.."|r" end
             elseif self.db.profile.useCustomColorForILvl then
                 iLvlText = ColorText(iLvlText, self.db.profile.iLvlCustomColor)
             end
 
-            DebugPrint("Item Level text for slot", ColorText(slot:GetID(), "Heirloom"), "=", iLvlText)
-            slot.muteCatItemLevel:SetFormattedText(iLvlText)
-            slot.muteCatItemLevel:Show()
-        else
-            self._pendingItemLevelRetry = self._pendingItemLevelRetry or {}
-            if self._pendingItemLevelRetry[slotID] then
-                return
+            -- Apply to Frame
+            if slot.muteCatItemLevel:GetText() ~= iLvlText then
+                slot.muteCatItemLevel:SetFormattedText(iLvlText)
             end
+            if not slot.muteCatItemLevel:IsShown() then slot.muteCatItemLevel:Show() end
+        else
+            -- Async retry if item level is not yet available (Blizzard data delay)
+            self._pendingItemLevelRetry = self._pendingItemLevelRetry or {}
+            if self._pendingItemLevelRetry[slotID] then return end
+            
             self._itemLevelRetryCount = self._itemLevelRetryCount or {}
             local retryCount = (self._itemLevelRetryCount[slotID] or 0) + 1
             self._itemLevelRetryCount[slotID] = retryCount
+            
             if retryCount > MAX_ITEMLEVEL_RETRIES then
-                DebugPrint("Item Level retry limit reached for slot", ColorText(slotID, "Heirloom"))
                 self._pendingItemLevelRetry[slotID] = nil
                 return
             end
+            
             self._pendingItemLevelRetry[slotID] = true
-            DebugPrint("Item Level not loaded yet, scheduling retry for slot", ColorText(slotID, "Heirloom"))
             C_Timer.After(0.5, function()
-                if self._pendingItemLevelRetry then
-                    self._pendingItemLevelRetry[slotID] = nil
-                end
-                if PaperDollFrame and PaperDollFrame:IsVisible() then
-                    self:GetItemLevelBySlot(slot)
-                end
+                if self._pendingItemLevelRetry then self._pendingItemLevelRetry[slotID] = nil end
+                if PaperDollFrame:IsVisible() then self:GetItemLevelBySlot(slot) end
             end)
         end
     else
@@ -186,170 +198,197 @@ function AddOn:GetItemLevelBySlot(slot)
     end
 end
 
----Fetches and formats the upgrade track for an item in the defined gear slot (if one exists)
----@param slot Slot The gear slot to get item level for
+---Retrieves and processes the upgrade track info for a slot.
+---@param slot Slot
 function AddOn:GetUpgradeTrackBySlot(slot)
     self:EnsureTextReplacementTables()
-    if not IsPlayerMaxLevelOrHide(self, slot.muteCatUpgradeTrack) then
-        return
-    end
+    if not IsPlayerMaxLevelOrHide(self, slot.muteCatUpgradeTrack) then return end
 
     local hasItem, item = self:IsItemEquippedInSlot(slot)
     if hasItem then
         local upgradeTrackText = ""
-        local lines = GetTooltipLinesCached(self, item:GetItemLink())
+        local itemLink = item:GetItemLink()
+        if not itemLink then return end
+        
+        local lines = GetTooltipLinesCached(self, itemLink)
         if lines then
             for _, ttdata in ipairs(lines) do
                 local leftText = ttdata and ttdata.leftText
-                local isUpgradeTrack = leftText and IsUpgradeTrackLine(leftText)
-                if ttdata and isUpgradeTrack then
-                    local upgradeText = ttdata.leftText
-                    upgradeText = self:AbbreviateText(upgradeText, self.UpgradeTextReplacements)
-                    upgradeTrackText = upgradeText
-                    DebugPrint("Upgrade track for item", ColorText(slot:GetID(), "Heirloom"), "=", upgradeText)
+                if leftText and IsUpgradeTrackLine(leftText) then
+                    upgradeTrackText = self:AbbreviateText(leftText, self.UpgradeTextReplacements)
                     break
                 end
             end
         end
 
-        if upgradeTrackText ~= "" and not IsMaxUpgradeTrackProgress(upgradeTrackText) then
+        local isMaxed = IsMaxUpgradeTrackProgress(upgradeTrackText)
+        if upgradeTrackText ~= "" and not isMaxed then
             local upgradeColor
             if self.db.profile.useCustomColorForUpgradeTrack then
                 upgradeColor = self.db.profile.upgradeTrackCustomColor
             else
-                -- Prefer deterministic track-tier coloring; fallback to item quality only when no tier is parsed.
                 upgradeColor = GetUpgradeTrackTierColor(self, upgradeTrackText)
                 if not upgradeColor then
                     local qualityHex = select(4, C_Item.GetItemQualityColor(item:GetItemQuality()))
                     upgradeColor = qualityHex and qualityHex:sub(3) or self.HexColorPresets.Info
                 end
             end
-            slot.muteCatUpgradeTrack:SetFormattedText(ColorText(upgradeTrackText, upgradeColor))
-            slot.muteCatUpgradeTrack:Show()
+            
+            local formattedText = ColorText(upgradeTrackText, upgradeColor)
+            if slot.muteCatUpgradeTrack:GetText() ~= formattedText then
+                slot.muteCatUpgradeTrack:SetFormattedText(formattedText)
+            end
+            if not slot.muteCatUpgradeTrack:IsShown() then slot.muteCatUpgradeTrack:Show() end
+        else
+            HideRegion(slot.muteCatUpgradeTrack)
         end
+    else
+        HideRegion(slot.muteCatUpgradeTrack)
     end
 end
 
----Fetches and formats the gems currently socketed for an item in the defined gear slot (if one exists).
----If sockets are empty/can be addded to the item and the option to show missing sockets is enabled, these will also be indicated in the formatted text.
----@param slot Slot The gear slot to get gem information for
+---Retrieves and processes gem/socket information for a slot.
+---@param slot Slot
 function AddOn:GetGemsBySlot(slot)
-    if not IsPlayerMaxLevelOrHide(self, slot.muteCatGems) then
-        return
-    end
+    if not IsPlayerMaxLevelOrHide(self, slot.muteCatGems) then return end
 
-    local isCharacterMaxLevel = true
     local hasItem, item = self:IsItemEquippedInSlot(slot)
     local isSocketableSlot = self:IsSocketableSlot(slot)
     local isAuxSocketableSlot = self:IsAuxSocketableSlot(slot)
+
     if hasItem and (isSocketableSlot or isAuxSocketableSlot) then
-        local existingSocketCount = 0
         local gemText = ""
-        local isLeftSide = self:GetSlotIsLeftSide(slot)
-        local lines = GetTooltipLinesCached(self, item:GetItemLink())
+        local isLeftSide = slot.IsLeftSide
+        local gemIconSize = (self.db.profile.gemScale or 1) * 15
+        local existingSocketCount = 0
+        local itemLink = item:GetItemLink()
+        if not itemLink then return end
+        
+        local lines = GetTooltipLinesCached(self, itemLink)
         if lines then
             for _, ttdata in ipairs(lines) do
-                if ttdata and ttdata.type and ttdata.type == self.TooltipDataType.Gem then
-                    -- Record discovered gem if applicable
+                if ttdata and ttdata.type == self.TooltipDataType.Gem then
                     if ttdata.gemIcon and ttdata.leftText then
                         self:SniffGem(ttdata.gemIcon, ttdata.leftText)
                     end
-                    -- Socketed item will have gemIcon variable
-                    local gemIconScale = self.db.profile.gemScale or 1
-                    local gemIconSize = gemIconScale * 15
                     
-                    if ttdata.gemIcon and isLeftSide then
-                        DebugPrint("Found Gem Icon on left side slot:", ColorText(slot:GetID(), "Heirloom"), ttdata.gemIcon, self.GetTextureString(ttdata.gemIcon, gemIconSize))
-                        gemText = gemText..self.GetTextureString(ttdata.gemIcon, gemIconSize)
-                    elseif ttdata.gemIcon then
-                        DebugPrint("Found Gem Icon:", ColorText(slot:GetID(), "Heirloom"), ttdata.gemIcon, self.GetTextureString(ttdata.gemIcon, gemIconSize))
-                        gemText = self.GetTextureString(ttdata.gemIcon, gemIconSize)..gemText
-                    -- Two conditions below check for tinker sockets
-                    elseif ttdata.socketType and isLeftSide then
-                        DebugPrint("Empty tinker socket for in slot on left side:", ColorText(slot:GetID(), "Heirloom"), self.GetTextureString("Interface/ItemSocketingFrame/UI-EmptySocket-"..ttdata.socketType, gemIconSize))
-                        gemText = gemText..self.GetTextureString("Interface/ItemSocketingFrame/UI-EmptySocket-"..ttdata.socketType, gemIconSize)
+                    local texture
+                    if ttdata.gemIcon then
+                        texture = self.GetTextureString(ttdata.gemIcon, gemIconSize)
                     elseif ttdata.socketType then
-                        DebugPrint("Empty tinker socket found in slot:", ColorText(slot:GetID(), "Heirloom"), self.GetTextureString("Interface/ItemSocketingFrame/UI-EmptySocket-"..ttdata.socketType, gemIconSize))
-                        gemText = self.GetTextureString("Interface/ItemSocketingFrame/UI-EmptySocket-"..ttdata.socketType, gemIconSize)..gemText
-                    -- The two conditions below indicate that there is an empty socket on the item
-                    elseif isLeftSide then
-                        DebugPrint("Empty socket found in slot on left side:", ColorText(slot:GetID(), "Heirloom"), self.GetTextureString(458977, gemIconSize))
-                        -- Texture: Interface/ItemSocketingFrame/UI-EmptySocket-Prismatic
-                        gemText = gemText..self.GetTextureString(458977, gemIconSize)
+                        texture = self.GetTextureString("Interface/ItemSocketingFrame/UI-EmptySocket-"..ttdata.socketType, gemIconSize)
                     else
-                        DebugPrint("Empty socket found in slot:", ColorText(slot:GetID(), "Heirloom"), self.GetTextureString(458977, gemIconSize))
-                        gemText = self.GetTextureString(458977, gemIconSize)..gemText
+                        texture = self.GetTextureString(458977, gemIconSize) -- Generic empty socket
                     end
+                    
+                    gemText = isLeftSide and (gemText..texture) or (texture..gemText)
                     existingSocketCount = existingSocketCount + 1
                 end
             end
         end
 
-        -- Indicates slots that can have sockets added to them
+        -- Check for missing sockets on priority slots (Hals, Ringe)
         local showGems = self:ShouldShowGems()
-        if showGems and self.db.profile.showMissingGems and isSocketableSlot and existingSocketCount < self.CurrentExpac.MaxSocketsPerItem then
-            if (self.db.profile.missingGemsMaxLevelOnly and isCharacterMaxLevel) or not self.db.profile.missingGemsMaxLevelOnly then
-                for i = 1, self.CurrentExpac.MaxSocketsPerItem - existingSocketCount, 1 do
-                    DebugPrint("Slot", ColorText(slot:GetID(), "Heirloom"), "can add", i, i == 1 and "socket" or "sockets")
-                    gemText = isLeftSide and gemText..self.GetTextureAtlasString("Socket-Prismatic-Closed") or self.GetTextureAtlasString("Socket-Prismatic-Closed")..gemText
+        local slotID = slot:GetID()
+        local isPrioritySocketSlot = (slotID == 2 or slotID == 11 or slotID == 12)
+
+        if showGems and self.db.profile.showMissingGems and isPrioritySocketSlot then
+            local maxExpected = self.CurrentExpac.MaxSocketsPerItem or 2
+            if existingSocketCount < maxExpected then
+                local texture = self.GetTextureAtlasString("Socket-Prismatic-Closed", gemIconSize)
+                for i = 1, maxExpected - existingSocketCount do
+                    gemText = isLeftSide and (gemText..texture) or (texture..gemText)
                 end
             end
         end
+
         if gemText ~= "" then
-            slot.muteCatGems:SetFormattedText(gemText)
-            slot.muteCatGems:Show()
+            if slot.muteCatGems:GetText() ~= gemText then
+                slot.muteCatGems:SetFormattedText(gemText)
+            end
+            if not slot.muteCatGems:IsShown() then slot.muteCatGems:Show() end
+        else
+            HideRegion(slot.muteCatGems)
         end
+    else
+        HideRegion(slot.muteCatGems)
     end
 end
 
----Fetches and formats the enchant details for an item in the defined gear slot (if one exists).
----If an item that can be enchanted isn't and the option to show missing enchants is enabled, this will also be indicated in the formatted text.
----@param slot Slot The gear slot to get gem information for
+---Retrieves and processes enchantment information for a slot.
+---@param slot Slot
 function AddOn:GetEnchantmentBySlot(slot)
-    if not IsPlayerMaxLevelOrHide(self, slot.muteCatEnchant) then
-        return
-    end
+    if not IsPlayerMaxLevelOrHide(self, slot.muteCatEnchant) then return end
 
-    local isCharacterMaxLevel = true
     local hasItem, item = self:IsItemEquippedInSlot(slot)
-    local isEnchantableSlot = self:IsEnchantableSlot(slot)
-    if hasItem and isEnchantableSlot then
-        local isEnchanted = false
-        local lines = GetTooltipLinesCached(self, item:GetItemLink())
-        if lines then
-            for _, ttdata in ipairs(lines) do
-                if ttdata and ttdata.type and ttdata.type == self.TooltipDataType.Enchant then
-                     local texture
-                    -- Always prioritize quality rank detection (Tier 1, 2, or 3) from the tooltip text
-                    local qualityTier = ttdata.leftText and ttdata.leftText:match("Tier(%d)")
-                    local enchIconSize = (self.db.profile.enchScale or 1) * 15 -- Back to standard base size
-                    
-                    if qualityTier then
-                        texture = self.GetTextureAtlasString("Professions-Icon-Quality-Tier" .. qualityTier, enchIconSize)
-                        DebugPrint("Enchant quality detected:", ColorText("Tier " .. qualityTier, "Heirloom"))
-                    end
-
-                    if not texture then
-                        -- Falls kein Qualitätsrang gefunden wurde (Legacy), nutzen wir das Häkchen
-                        texture = self.GetTextureString(628564, enchIconSize)
-                    end
+    local isEncSlot = self:IsEnchantableSlot(slot)
     
-                    local color = self.db.profile.useCustomColorForEnchants and self.db.profile.enchCustomColor or "Uncommon"
-                    slot.muteCatEnchant:SetFormattedText(ColorText(texture, color))
-                    slot.muteCatEnchant:Show()
-                    isEnchanted = true
-                    break
+    if hasItem and isEncSlot then
+        local itemLink = item:GetItemLink()
+        if not itemLink then return end
+        
+        local enchantID = GetEnchantIDFromLink(itemLink)
+        local texture
+        local size = (self.db.profile.enchScale or 1) * 15
+
+        -- Strategy 1: Use LibEnchantData (Midnight 12.0.1+ & DK Runes)
+        if enchantID and self.LibEnchantData then
+            local spellID = self.LibEnchantData:GetSpellID(enchantID)
+            if spellID then
+                texture = C_Spell.GetSpellTexture(spellID)
+                if texture then
+                    texture = self.GetTextureString(texture, size)
                 end
             end
         end
 
-        if not isEnchanted and isEnchantableSlot and self.db.profile.showMissingEnchants then
-            if (self.db.profile.missingEnchantsMaxLevelOnly and isCharacterMaxLevel) or not self.db.profile.missingEnchantsMaxLevelOnly then
-                slot.muteCatEnchant:SetFormattedText(self.GetTextureString(523826))
-                slot.muteCatEnchant:Show()
+        -- Strategy 2: Fallback to Tooltip "Quality Tier" icons (Legacy/Other Expansions)
+        if not texture then
+            local lines = GetTooltipLinesCached(self, itemLink)
+            if lines then
+                for _, ttdata in ipairs(lines) do
+                    if ttdata and ttdata.type == self.TooltipDataType.Enchant then
+                        local tier = ttdata.leftText and ttdata.leftText:match("Tier(%d)")
+                        local qualityTier = tonumber(tier)
+                        if qualityTier and qualityTier > 0 then
+                            texture = self.GetTextureAtlasString("Professions-Icon-Quality-Tier" .. qualityTier, size)
+                            break
+                        elseif ttdata.leftText and ttdata.leftText:find(L["Enchanted"]) then
+                            -- Generic enchanted string detection if no tier icon found
+                            texture = self.GetTextureString(628564, size) -- Default Scroll
+                        end
+                    end
+                end
             end
         end
+
+        -- Strategy 3: Generic Placeholder for known Enchant IDs without Spell Mapping
+        if not texture and (enchantID and enchantID > 0) then
+            texture = self.GetTextureString(628564, size) -- Default Scroll
+        end
+
+        if texture then
+            local color = self.db.profile.useCustomColorForEnchants and self.db.profile.enchCustomColor or "Uncommon"
+            local formattedText = ColorText(texture, color)
+            
+            if slot.muteCatEnchant:GetText() ~= formattedText then
+                slot.muteCatEnchant:SetFormattedText(formattedText)
+            end
+            if not slot.muteCatEnchant:IsShown() then slot.muteCatEnchant:Show() end
+            return
+        end
+
+        -- Strategy 4: Show Missing Enchant Warning
+        if self.db.profile.showMissingEnchants then
+            local missingTexture = self.GetTextureString(523826)
+            if slot.muteCatEnchant:GetText() ~= missingTexture then
+                slot.muteCatEnchant:SetFormattedText(missingTexture)
+            end
+            if not slot.muteCatEnchant:IsShown() then slot.muteCatEnchant:Show() end
+        else
+            HideRegion(slot.muteCatEnchant)
+        end
+    else
+        HideRegion(slot.muteCatEnchant)
     end
 end
-
-

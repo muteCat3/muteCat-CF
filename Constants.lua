@@ -1,6 +1,13 @@
+--------------------------------------------------------------------------------
+-- muteCat CF - Constants
+-- Core configuration, color presets, and expansion metadata.
+--------------------------------------------------------------------------------
+
 local addonName, AddOn = ...
 ---@class muteCatCF: AceAddon, AceConsole-3.0, AceEvent-3.0
 AddOn = LibStub("AceAddon-3.0"):NewAddon(addonName, "AceConsole-3.0", "AceEvent-3.0")
+
+-- Localization setup
 if not AddOn.L then
     AddOn.L = setmetatable({}, {
         __index = function(t, k)
@@ -12,14 +19,12 @@ end
 local L = AddOn.L
 
 ---@class TextReplacement
----@field original string The localization key for the original text to search for when abbreviating text
----@field replacement string The localization key for the abbreviation for the original text
+---@field original string The localization key for the original text to search for
+---@field replacement string The replacement abbreviation
 
----Builds text replacement tables lazily.
+---Builds text replacement tables lazily for abbreviation logic.
 function AddOn:EnsureTextReplacementTables()
-    if self.UpgradeTextReplacements then
-        return
-    end
+    if self.UpgradeTextReplacements then return end
 
     ---@type TextReplacement[]
     self.UpgradeTextReplacements = {
@@ -34,6 +39,7 @@ function AddOn:EnsureTextReplacementTables()
 end
 
 ---@enum HexColorPresets
+---Predefined hexadecimal color codes for various UI elements.
 AddOn.HexColorPresets = {
     Poor = "9D9D9D",
     Uncommon = "1EFF00",
@@ -45,6 +51,8 @@ AddOn.HexColorPresets = {
     Info = "FFD100",
     PrevSeasonGear = "808080",
     Error = "FF3300",
+    
+    -- Class Colors
     DeathKnight = "C41E3A",
     DemonHunter = "A330C9",
     Druid = "FF7C0A",
@@ -60,69 +68,48 @@ AddOn.HexColorPresets = {
     Warrior = "C69B6D"
 }
 
----A list of character gear slots visible in the Character Info window
----@type Slot[]
-AddOn.GearSlots = {
-    CharacterHeadSlot,
-    CharacterNeckSlot,
-    CharacterShoulderSlot,
-    CharacterBackSlot,
-    CharacterChestSlot,
-    CharacterShirtSlot,
-    CharacterTabardSlot,
-    CharacterWristSlot,
-    CharacterHandsSlot,
-    CharacterWaistSlot,
-    CharacterLegsSlot,
-    CharacterFeetSlot,
-    CharacterFinger0Slot,
-    CharacterFinger1Slot,
-    CharacterTrinket0Slot,
-    CharacterTrinket1Slot,
-    CharacterMainHandSlot,
-    CharacterSecondaryHandSlot
-}
+---A list of character gear SlotIDs visible in the Character Info window.
+AddOn.GearSlotIDs = { 1, 2, 3, 15, 5, 4, 19, 9, 10, 6, 7, 8, 11, 12, 13, 14, 16, 17 }
 
 ---@class ExpansionDetails
----@field LevelCap number The maximum reachable level for the expansion
----@field SocketableSlots Slot[] A list of gear slots that can have a gem socket added to it in the expansion.
----@field AuxSocketableSlots Slot[] A list of gear slots that can have a gem socket added to it via auxillary methods in the expansion (example: S.A.D. in _The War Within_).
----@field MaxSocketsPerItem number The maximum number of sockets an item can have
----@field MaxAuxSocketsPerItem number The maximum number of sockets items that can be socketed via auxillary methods can have
----@field EnchantableSlots Slot[] A list of gear slots that can be enchanted in the expansion.
----@field HeadEnchantAvailable boolean Indicates whether or not a head enchant from the expansion is currently available in-game
----@field ShieldEnchantAvailable boolean Indicates whether or not a shield enchant from the expansion is currently available in-game
----@field OffhandEnchantAvailable boolean Indicates whether or not an off-hand enchant from the expansion is currently available in-game
+---@field LevelCap number
+---@field SocketableSlots table<number, boolean>
+---@field AuxSocketableSlots table<number, boolean>
+---@field MaxSocketsPerItem number
+---@field MaxAuxSocketsPerItem number
+---@field EnchantableSlots table<number, boolean>
+---@field HeadEnchantAvailable boolean
+---@field ShieldEnchantAvailable boolean
+---@field OffhandEnchantAvailable boolean
 
 ---@type table<string, ExpansionDetails>
----@see Frame for generic definition along without common functions and variables available for all Frames
 AddOn.ExpansionInfo = {
     Midnight = {
         LevelCap = 90,
         SocketableSlots = {
-            CharacterNeckSlot,
-            CharacterFinger0Slot,
-            CharacterFinger1Slot
+            [2] = true, -- Neck
+            [11] = true, -- Finger0
+            [12] = true, -- Finger1
         },
         AuxSocketableSlots = {
-            CharacterHeadSlot,
-            CharacterWristSlot,
-            CharacterWaistSlot,
-            CharacterBackSlot
+            [1] = true, -- Head
+            [9] = true, -- Wrist
+            [6] = true, -- Waist
+            [15] = true, -- Back
         },
         MaxSocketsPerItem = 2,
         MaxAuxSocketsPerItem = 1,
         EnchantableSlots = {
-            CharacterHeadSlot,
-            CharacterBackSlot,
-            CharacterChestSlot,
-            CharacterWristSlot,
-            CharacterLegsSlot,
-            CharacterFeetSlot,
-            CharacterFinger0Slot,
-            CharacterFinger1Slot,
-            CharacterMainHandSlot,
-            CharacterSecondaryHandSlot
+            [1] = true, -- Head
+            [15] = true, -- Back
+            [5] = true, -- Chest
+            [9] = true, -- Wrist
+            [7] = true, -- Legs
+            [8] = true, -- Feet
+            [11] = true, -- Finger0
+            [12] = true, -- Finger1
+            [16] = true, -- MainHand
+            [17] = true, -- SecondaryHand
         },
         HeadEnchantAvailable = false,
         ShieldEnchantAvailable = true,
@@ -131,6 +118,7 @@ AddOn.ExpansionInfo = {
 }
 
 ---@enum TooltipDataType
+---Maps internal Blizzard tooltip line types to readable names.
 AddOn.TooltipDataType = {
     UpgradeTrack = 42,
     Gem = 3,

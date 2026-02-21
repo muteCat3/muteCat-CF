@@ -1,9 +1,9 @@
-## Interface: 120001
+## Interface: 120005, 120001
 ## Title: muteCat CF
 ## Notes: Displays useful information about equipped gear in the Character Info window
 ## IconTexture: Interface/Icons/INV_Chest_Plate08
 ## Author: muteCat
-## Version: 1.14.0
+## Version: 13.0.0
 ## SavedVariables: muteCatCFDB
 ## Category: User Interface
 ## OptionalDeps: Blizzard_CharacterUI

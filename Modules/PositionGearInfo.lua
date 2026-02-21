@@ -1,47 +1,29 @@
+--------------------------------------------------------------------------------
+-- muteCat CF - PositionGearInfo
+-- Logic for positioning and layout of gear info FontStrings on the Character Frame.
+--------------------------------------------------------------------------------
+
 local addonName, AddOn = ...
 ---@class muteCatCF: AceAddon, AceConsole-3.0, AceEvent-3.0
 AddOn = LibStub("AceAddon-3.0"):GetAddon(addonName)
 
-local DebugPrint = AddOn.DebugPrint
-
----@param slot Slot
----@return boolean itemLevelShown
----@return boolean itemLevelShownOnItem
----@return boolean upgradeTrackShown
----@return boolean gemsShown
----@return boolean enchantShown
-local function GetSlotVisibilityState(self, slot)
-    local itemLevelShown = self.db.profile.showiLvl
-        and not self.db.profile.iLvlOnItem
-        and slot.muteCatItemLevel
-        and slot.muteCatItemLevel:IsShown()
-    local itemLevelShownOnItem = self.db.profile.showiLvl
-        and self.db.profile.iLvlOnItem
-        and slot.muteCatItemLevel
-        and slot.muteCatItemLevel:IsShown()
-    local upgradeTrackShown = self:ShouldShowUpgradeTrack()
-        and slot.muteCatUpgradeTrack
-        and slot.muteCatUpgradeTrack:IsShown()
-    local gemsShown = self:ShouldShowGems()
-        and slot.muteCatGems
-        and slot.muteCatGems:IsShown()
-    local enchantShown = self:ShouldShowEnchants()
-        and slot.muteCatEnchant
-        and slot.muteCatEnchant:IsShown()
-    return itemLevelShown, itemLevelShownOnItem, upgradeTrackShown, gemsShown, enchantShown
-end
-
+---Cache a point on a region to avoid redundant SetPoint calls.
 ---@param region Region
 ---@param point string
----@param relativeTo Region|Frame
+---@param relativeTo Region|string
 ---@param relativePoint string
 ---@param xOffset number
 ---@param yOffset number
 local function SetPointCached(region, point, relativeTo, relativePoint, xOffset, yOffset)
     if not region then return end
     local cache = region.muteCatPointCache
-    if cache
-        and cache.point == point
+    if not cache then
+        cache = {}
+        region.muteCatPointCache = cache
+    end
+    
+    yOffset = yOffset or 0
+    if cache.point == point
         and cache.relativeTo == relativeTo
         and cache.relativePoint == relativePoint
         and cache.xOffset == xOffset
@@ -52,10 +34,7 @@ local function SetPointCached(region, point, relativeTo, relativePoint, xOffset,
 
     region:ClearAllPoints()
     region:SetPoint(point, relativeTo, relativePoint, xOffset, yOffset)
-    if not cache then
-        cache = {}
-        region.muteCatPointCache = cache
-    end
+    
     cache.point = point
     cache.relativeTo = relativeTo
     cache.relativePoint = relativePoint
@@ -63,105 +42,131 @@ local function SetPointCached(region, point, relativeTo, relativePoint, xOffset,
     cache.yOffset = yOffset
 end
 
----Set item level text position in the Character Info window
----@param slot Slot The gear slot to set item level position for
-function AddOn:SetItemLevelPositionBySlot(slot)
-    local isWeaponSlot = slot == CharacterMainHandSlot or slot == CharacterSecondaryHandSlot
+---Update the layout and positioning of all gear info elements for a specific slot.
+---@param slot Slot
+function AddOn:UpdateSlotLayout(slot)
+    local slotID = slot:GetID()
+    local profile = self.db.profile
+    
+    local ilvl = slot.muteCatItemLevel
+    local track = slot.muteCatUpgradeTrack
+    local gems = slot.muteCatGems
+    local ench = slot.muteCatEnchant
+    
+    local ilvlShown = profile.showiLvl and ilvl and ilvl:IsShown()
+    local trackShown = self:ShouldShowUpgradeTrack() and track and track:IsShown()
+    local gemsShown = self:ShouldShowGems() and gems and gems:IsShown()
+    local enchShown = self:ShouldShowEnchants() and ench and ench:IsShown()
+    
+    local isLeftSide = slot.IsLeftSide
+    local isWeaponSlot = slotID == 16 or slotID == 17
+    local baseOffset = (isLeftSide and 1 or -1) * 10
     local weaponXOffset = isWeaponSlot and 1 or 0
 
-    if self.db.profile.iLvlOnItem then
-        SetPointCached(slot.muteCatItemLevel, "CENTER", slot, "TOP", weaponXOffset, -10)
-    elseif slot.IsLeftSide == nil then
-        SetPointCached(slot.muteCatItemLevel, "CENTER", slot, "TOP", weaponXOffset, 10)
-    else
-        SetPointCached(slot.muteCatItemLevel, slot.IsLeftSide and "LEFT" or "RIGHT", slot, slot.IsLeftSide and "RIGHT" or "LEFT", (slot.IsLeftSide and 1 or -1) * 10, 0)
-    end
-end
+    -- Throttling: Use a layout flag to avoid redundant calculations in the same frame
+    local now = GetTime()
+    if slot._lastMuteCatLayout == now then return end
+    slot._lastMuteCatLayout = now
 
-
----Set upgrade track text position in the Character Info window
----@param slot Slot The gear slot to set upgrade tracks position for
-function AddOn:SetUpgradeTrackPositionBySlot(slot)
-    local itemLevelShown, itemLevelShownOnItem = GetSlotVisibilityState(self, slot)
-    local isMainHand = slot == CharacterMainHandSlot
-    local yOffset = (slot == CharacterHandsSlot or slot == CharacterLegsSlot or slot == CharacterWristSlot) and 1 or 0
-
-    if slot.IsLeftSide == nil then
-        SetPointCached(slot.muteCatUpgradeTrack, "CENTER", slot, "BOTTOM", (isMainHand and -1 or 1) * 40, 5)
-    elseif itemLevelShownOnItem then
-        SetPointCached(slot.muteCatUpgradeTrack, slot.IsLeftSide and "LEFT" or "RIGHT", slot, slot.IsLeftSide and "RIGHT" or "LEFT", (slot.IsLeftSide and 1 or -1) * 10, yOffset)
-    elseif itemLevelShown then
-        SetPointCached(slot.muteCatUpgradeTrack, slot.IsLeftSide and "LEFT" or "RIGHT", slot.muteCatItemLevel, slot.IsLeftSide and "RIGHT" or "LEFT", slot.IsLeftSide and 1.5 or -1.5, yOffset)
-    else
-        SetPointCached(slot.muteCatUpgradeTrack, slot.IsLeftSide and "LEFT" or "RIGHT", slot, slot.IsLeftSide and "RIGHT" or "LEFT", (slot.IsLeftSide and 1 or -1) * 10, yOffset)
-    end
-end
-
-
----Set gems text position in the Character Info window
----@param slot Slot The gear slot to set gems position for
-function AddOn:SetGemsPositionBySlot(slot)
-    local itemLevelShown, itemLevelShownOnItem, upgradeTrackShown, _, enchantShown = GetSlotVisibilityState(self, slot)
-    local isMainHand = slot == CharacterMainHandSlot
-
-    -- Gems on weapon/shield/off-hand slots (not possible as far as I am aware, but you never know)
-    if enchantShown and slot.IsLeftSide ~= nil then
-        SetPointCached(slot.muteCatGems, slot.IsLeftSide and "LEFT" or "RIGHT", slot.muteCatEnchant, slot.IsLeftSide and "RIGHT" or "LEFT", slot.IsLeftSide and 4 or -4, 0)
-    elseif itemLevelShown and slot.IsLeftSide ~= nil and gemsShown then
-        SetPointCached(slot.muteCatItemLevel, slot.IsLeftSide and "LEFT" or "RIGHT", slot, slot.IsLeftSide and "RIGHT" or "LEFT", (slot.IsLeftSide and 1 or -1) * 10, slot.muteCatItemLevel:GetHeight() / 1.5)
-        SetPointCached(slot.muteCatGems, slot.IsLeftSide and "LEFT" or "RIGHT", slot, slot.IsLeftSide and "RIGHT" or "LEFT", (slot.IsLeftSide and 1 or -1) * 10, (slot.muteCatItemLevel:GetHeight() / 1.5) * -1)
-    elseif upgradeTrackShown and slot.IsLeftSide == nil then
-        SetPointCached(slot.muteCatGems, isMainHand and "RIGHT" or "LEFT", slot.muteCatUpgradeTrack, isMainHand and "LEFT" or "RIGHT", isMainHand and -1 or 1, 0)
-    elseif upgradeTrackShown then
-        SetPointCached(slot.muteCatGems, slot.IsLeftSide and "LEFT" or "RIGHT", slot.muteCatUpgradeTrack, slot.IsLeftSide and "RIGHT" or "LEFT", slot.IsLeftSide and 2 or -2, 0)
-    elseif itemLevelShownOnItem and slot.IsLeftSide == nil then
-        SetPointCached(slot.muteCatGems, "CENTER", slot, "BOTTOM", (isMainHand and -1 or 1) * 40, 5)
-    elseif itemLevelShownOnItem then
-        SetPointCached(slot.muteCatGems, slot.IsLeftSide and "LEFT" or "RIGHT", slot, slot.IsLeftSide and "RIGHT" or "LEFT", (slot.IsLeftSide and 1 or -1) * 10, 0)
-    elseif itemLevelShown and slot.IsLeftSide == nil then
-        SetPointCached(slot.muteCatGems, "LEFT", slot.muteCatItemLevel, "RIGHT", 1, 0)
-    elseif itemLevelShown then
-        SetPointCached(slot.muteCatGems, slot.IsLeftSide and "LEFT" or "RIGHT", slot.muteCatItemLevel, slot.IsLeftSide and "RIGHT" or "LEFT", slot.IsLeftSide and 2 or -2, 0)
-    elseif slot.IsLeftSide == nil then
-        SetPointCached(slot.muteCatGems, "CENTER", slot, "TOP", 0, 10)
-    else
-        SetPointCached(slot.muteCatGems, slot.IsLeftSide and "LEFT" or "RIGHT", slot, slot.IsLeftSide and "RIGHT" or "LEFT", (slot.IsLeftSide and 1 or -1) * 10, 0)
-    end
-end
-
-
----Set enchant text position in the Character Info window
----@param slot Slot The gear slot to set enchant position for
-function AddOn:SetEnchantPositionBySlot(slot)
-    local isSocketableSlot = self:IsSocketableSlot(slot) or self:IsAuxSocketableSlot(slot)
-    local isEnchantableSlot = self:IsEnchantableSlot(slot)
-    local itemLevelShown, itemLevelShownOnItem, upgradeTrackShown, gemsShown = GetSlotVisibilityState(self, slot)
-    if itemLevelShown and slot.IsLeftSide ~= nil and isEnchantableSlot then
-        -- Adjust positioning for slots that have both item level and enchants visible
-        DebugPrint("ilvl and enchant visible")
-        SetPointCached(slot.muteCatItemLevel, slot.IsLeftSide and "LEFT" or "RIGHT", slot, slot.IsLeftSide and "RIGHT" or "LEFT", (slot.IsLeftSide and 1 or -1) * 10, slot.muteCatItemLevel:GetHeight() / 1.5)
-        SetPointCached(slot.muteCatEnchant, slot.IsLeftSide and "LEFT" or "RIGHT", slot, slot.IsLeftSide and "RIGHT" or "LEFT", (slot.IsLeftSide and 1 or -1) * 10, (slot.muteCatItemLevel:GetHeight() / 1.5) * -1)
-    elseif upgradeTrackShown and slot.IsLeftSide ~= nil and isEnchantableSlot then
-        -- Adjust positioning for slots that have both upgrade track and enchants visible
-        DebugPrint("upgrade track and enchant visible in slot", slot:GetID())
-        SetPointCached(slot.muteCatUpgradeTrack, slot.IsLeftSide and "LEFT" or "RIGHT", slot, slot.IsLeftSide and "RIGHT" or "LEFT", (slot.IsLeftSide and 1 or -1) * 10, slot.muteCatUpgradeTrack:GetHeight() / 1.5)
-        SetPointCached(slot.muteCatEnchant, slot.IsLeftSide and "LEFT" or "RIGHT", slot, slot.IsLeftSide and "RIGHT" or "LEFT", (slot.IsLeftSide and 1 or -1) * 10, (slot.muteCatUpgradeTrack:GetHeight() / 1.5) * -1)
-    elseif (not self.db.profile.showiLvl or itemLevelShownOnItem) and gemsShown and slot.IsLeftSide ~= nil and isSocketableSlot and isEnchantableSlot then
-        SetPointCached(slot.muteCatEnchant, slot.IsLeftSide and "LEFT" or "RIGHT", slot, slot.IsLeftSide and "RIGHT" or "LEFT", (slot.IsLeftSide and 1 or -1) * 10, 0)
-    elseif slot.IsLeftSide == nil then
-        if slot.muteCatItemLevel and slot.muteCatItemLevel:IsShown() then
-            SetPointCached(slot.muteCatEnchant, "BOTTOM", slot.muteCatItemLevel, "TOP", 0, 3)
-        else
-            SetPointCached(slot.muteCatEnchant, slot == CharacterMainHandSlot and "RIGHT" or "LEFT", slot, slot == CharacterMainHandSlot and "TOPRIGHT" or "TOPLEFT", slot == CharacterMainHandSlot and -3 or 0, 25)
+    ----------------------------------------------------------------------------
+    -- WEAPON SLOTS (Bottom row: Main-hand, Off-hand, Ranged)
+    ----------------------------------------------------------------------------
+    if isLeftSide == nil then
+        -- 1. Item Level
+        if ilvlShown then
+            local y = profile.iLvlOnItem and -10 or 10
+            SetPointCached(ilvl, "CENTER", slot, "TOP", weaponXOffset, y)
         end
-    else
-        SetPointCached(slot.muteCatEnchant, slot.IsLeftSide and "LEFT" or "RIGHT", slot, slot.IsLeftSide and "RIGHT" or "LEFT", (slot.IsLeftSide and 1 or -1) * 10, 0)
+
+        -- 2. Upgrade Track
+        if trackShown then
+            local x = (slotID == 16 and -1 or 1) * 40
+            SetPointCached(track, "CENTER", slot, "BOTTOM", x, 5)
+        end
+
+        -- 3. Enchant
+        if enchShown then
+            if ilvlShown and not profile.iLvlOnItem then
+                SetPointCached(ench, "BOTTOM", ilvl, "TOP", 0, 3)
+            else
+                local p = slotID == 16 and "RIGHT" or "LEFT"
+                local rp = slotID == 16 and "TOPRIGHT" or "TOPLEFT"
+                local x = slotID == 16 and -3 or 0
+                SetPointCached(ench, p, slot, rp, x, 25)
+            end
+        end
+
+        -- 4. Gems
+        if gemsShown then
+             if trackShown then
+                local p = (slotID == 16) and "RIGHT" or "LEFT"
+                local rp = (slotID == 16) and "LEFT" or "RIGHT"
+                local x = (slotID == 16) and -1 or 1
+                SetPointCached(gems, p, track, rp, x, 0)
+             elseif ilvlShown and not profile.iLvlOnItem then
+                SetPointCached(gems, "LEFT", ilvl, "RIGHT", 1, 0)
+             else
+                SetPointCached(gems, "CENTER", slot, "TOP", weaponXOffset, 10)
+             end
+        end
+        return
     end
 
-    -- Re-anchor gems after enchant placement because gems are positioned earlier in the update flow.
-    if gemsShown and isEnchantableSlot and slot.IsLeftSide ~= nil and slot.muteCatEnchant and slot.muteCatEnchant:IsShown() and slot.muteCatGems and slot.muteCatGems:IsShown() then
-        SetPointCached(slot.muteCatGems, slot.IsLeftSide and "LEFT" or "RIGHT", slot.muteCatEnchant, slot.IsLeftSide and "RIGHT" or "LEFT", slot.IsLeftSide and 4 or -4, 0)
+    ----------------------------------------------------------------------------
+    -- SIDE SLOTS (Left or Right side of the character model)
+    ----------------------------------------------------------------------------
+    local anchor = isLeftSide and "LEFT" or "RIGHT"
+    local slotAnchor = isLeftSide and "RIGHT" or "LEFT"
+    local smallGap = isLeftSide and 2 or -2
+    local gemGap = isLeftSide and 4 or -4
+
+    -- Row Visibility Status
+    local hasTopRow = (ilvlShown and not profile.iLvlOnItem) or trackShown
+    local hasBottomRow = enchShown or gemsShown
+    
+    -- Calculate Vertical Offsets (Standardized centering logic)
+    local topRowY = 0
+    local bottomRowY = 0
+    
+    if hasTopRow and hasBottomRow then
+        topRowY = 6    -- Push top row up
+        bottomRowY = -8 -- Push bottom row down
+    elseif hasTopRow then
+        topRowY = 0    -- Center top row vertically if it's the only one
+    elseif hasBottomRow then
+        bottomRowY = 0 -- Center bottom row vertically if it's the only one
+    end
+
+    -- 1. Item Level
+    if ilvlShown then
+        if profile.iLvlOnItem then
+            SetPointCached(ilvl, "CENTER", slot, "TOP", 0, -10)
+        else
+            SetPointCached(ilvl, anchor, slot, slotAnchor, baseOffset, topRowY)
+        end
+    end
+
+    -- 2. Upgrade Track (Position next to iLvl if available)
+    if trackShown then
+        if ilvlShown and not profile.iLvlOnItem then
+            SetPointCached(track, anchor, ilvl, slotAnchor, smallGap, 0)
+        else
+            SetPointCached(track, anchor, slot, slotAnchor, baseOffset, topRowY)
+        end
+    end
+
+    -- 3. Enchant (Standard bottom row start)
+    if enchShown then
+        SetPointCached(ench, anchor, slot, slotAnchor, baseOffset, bottomRowY)
+    end
+
+    -- 4. Gems (Position next to enchant if available)
+    if gemsShown then
+        if enchShown then
+            SetPointCached(gems, anchor, ench, slotAnchor, gemGap, 0)
+        else
+            -- If no enchant is shown,gems occupy the starting spot of the bottom row
+            SetPointCached(gems, anchor, slot, slotAnchor, baseOffset, bottomRowY)
+        end
     end
 end
-
-
